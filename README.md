@@ -1,2 +1,20 @@
-# grow-snap
-A short-form video platform for growth-focused content. Watch educational shorts, motivational clips, and skill-building videos that help you grow instead of just scrolling.
+# GrowSnap
+
+> 스크롤 시간을 성장 시간으로
+
+## 프로젝트 소개
+GrowSnap은 교육과 동기부여 콘텐츠에 특화된 숏폼 영상 플랫폼입니다. 
+단순한 시간 소비가 아닌, 매일 조금씩 성장할 수 있는 의미있는 쇼츠 콘텐츠를 제공하는 플랫폼을 목표로 합니다.
+
+## 목표
+- 1-3분 분량의 교육 콘텐츠 제공
+- 일상 속 동기부여와 영감 전달
+- 출퇴근, 쉬는 시간에 부담없이 학습
+- 무의미한 스크롤을 의미있는 성장으로 전환
+
+## 주요 기능
+- 다양한 주제의 교육 쇼츠
+- 매일 동기부여 콘텐츠
+- 마이크로 러닝 영상
+- 모바일 최적화 스와이프 인터페이스
+- 관심 콘텐츠 저장 및 관리
