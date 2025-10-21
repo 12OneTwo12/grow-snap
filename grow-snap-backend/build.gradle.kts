@@ -8,6 +8,8 @@ plugins {
 
     id("jacoco")
     id ("io.gitlab.arturbosch.detekt") version "1.23.6"
+
+    id("nu.studer.jooq") version "8.2"
 }
 
 group = "me.onetwo"
@@ -40,6 +42,16 @@ dependencies {
     testImplementation("org.springframework.restdocs:spring-restdocs-mockmvc")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // JOOQ 기본 런타임 라이브러리
+    implementation("org.jooq:jooq:3.17.23")
+    implementation("org.springframework.boot:spring-boot-starter-jooq") // jooq, Spring과 통합하는 경우 추가
+
+    // JOOQ 코드 생성 관련 라이브러리
+    jooqGenerator("org.jooq:jooq-meta:3.17.23")
+    jooqGenerator("org.jooq:jooq-codegen:3.17.23")
+    // DDLDatabase 지원 라이브러리 추가
+    jooqGenerator("org.jooq:jooq-meta-extensions:3.17.23")
 }
 
 kotlin {
@@ -54,6 +66,7 @@ tasks.withType<Test> {
 
 tasks.test {
     outputs.dir(project.extra["snippetsDir"]!!)
+    finalizedBy("jacocoTestReport")
 }
 
 tasks.asciidoctor {
@@ -74,7 +87,11 @@ tasks.register<Copy>("buildDocument") {
     into(file("build/resources/main/static/docs"))
 }
 
-tasks.bootJar {
+tasks.named("bootJar") {
+    dependsOn("buildDocument")
+}
+
+tasks.named("resolveMainClassName") {
     dependsOn("buildDocument")
 }
 
@@ -83,10 +100,6 @@ tasks.bootJar {
 extensions.configure<JacocoPluginExtension> {
     toolVersion = "0.8.11"
     reportsDirectory.set(layout.buildDirectory.dir("reports/jacoco"))
-}
-
-tasks.test {
-    finalizedBy("jacocoTestReport")
 }
 
 val excludedClasses = listOf(
@@ -100,6 +113,13 @@ val excludedClasses = listOf(
     "**/test/**"
 )
 
+val jacocoClassDirectories = layout.buildDirectory.dir("classes").map { dir ->
+    fileTree(dir) {
+        include("**/*.class")
+        exclude(excludedClasses)
+    }
+}
+
 tasks.named<JacocoReport>("jacocoTestReport") {
     dependsOn(tasks.test)
 
@@ -108,35 +128,13 @@ tasks.named<JacocoReport>("jacocoTestReport") {
         xml.required.set(true)
     }
 
-    val allClassesDirs = layout.buildDirectory.dir("classes")
-
-    classDirectories.setFrom(
-        allClassesDirs.map { dir ->
-            fileTree(dir) {
-                include("**/*.class")
-                exclude(
-                    excludedClasses
-                )
-            }
-        }
-    )
+    classDirectories.setFrom(jacocoClassDirectories)
 }
 
 tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     dependsOn(tasks.test)
 
-    val allClassesDirs = layout.buildDirectory.dir("classes")
-
-    classDirectories.setFrom(
-        allClassesDirs.map { dir ->
-            fileTree(dir) {
-                include("**/*.class")
-                exclude(
-                    excludedClasses
-                )
-            }
-        }
-    )
+    classDirectories.setFrom(jacocoClassDirectories)
 
     violationRules {
         rule {
@@ -163,4 +161,60 @@ detekt {
     allRules = false
     config.setFrom(file(detektConfigFile)) // Detekt에서 제공된 yml에서 Rule 설정 On/Off 가능
     ignoreFailures = true // detekt 빌드시 실패 ignore 처리
+}
+
+jooq {
+    version.set("3.17.23")
+
+    configurations {
+        create("main") {
+            generateSchemaSourceOnCompilation.set(true)
+
+            jooqConfiguration.apply {
+                generator.apply {
+                    name = "org.jooq.codegen.KotlinGenerator"
+
+                    database.apply {
+                        name = "org.jooq.meta.extensions.ddl.DDLDatabase" // DDL 파일 사용 설정
+                        properties.add(
+                            org.jooq.meta.jaxb.Property().apply {
+                                key = "scripts"
+                                value = "src/main/resources/sql/create-table-sql.sql" // DDL 파일 경로
+                            }
+                        )
+                        properties.add(
+                            org.jooq.meta.jaxb.Property().apply {
+                                key = "sort"
+                                value = "semantic" // 테이블 참조 관계 정렬
+                            }
+                        )
+                        properties.add(
+                            org.jooq.meta.jaxb.Property().apply {
+                                key = "unqualifiedSchema"
+                                value = "true" // 스키마 이름 제거
+                            }
+                        )
+                    }
+
+                    generate.apply {
+                        isPojos = true  // Kotlin 데이터 클래스로 생성
+                        isDaos = true   // DAO 클래스 생성
+                    }
+
+                    target.apply {
+                        packageName = "com.onetwo.growsnap.jooq.generated" // JOOQ 코드 저장 경로
+                        directory = "src/main/generated"
+                    }
+                }
+            }
+        }
+    }
+}
+
+sourceSets {
+    main {
+        kotlin {
+            srcDirs("src/main/generated") // JOOQ 코드가 있는 폴더 소스 코드로 추가
+        }
+    }
 }
