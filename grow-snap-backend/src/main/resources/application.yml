@@ -1,3 +1,60 @@
 spring:
   application:
     name: grow-snap-backend
+
+  # Datasource Configuration (JDBC for JOOQ)
+  datasource:
+    url: jdbc:mysql://localhost:3306/growsnap?useSSL=false&characterEncoding=UTF-8&serverTimezone=UTC
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  # Security OAuth2 Configuration
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
+            redirect-uri: "{baseUrl}/api/v1/auth/oauth2/callback/{registrationId}"
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-change-this-in-production-min-256-bits}
+  access-token-expiration: 3600000  # 1시간 (밀리초)
+  refresh-token-expiration: 1209600000  # 14일 (밀리초)
+
+# Logging
+logging:
+  level:
+    root: INFO
+    me.onetwo.growsnap: DEBUG
+    org.springframework.security: DEBUG
+    org.jooq: DEBUG
+
+# Server Configuration
+server:
+  port: 8080

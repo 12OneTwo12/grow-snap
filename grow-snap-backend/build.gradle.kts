@@ -43,6 +43,23 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // OAuth2 Client
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+
+    // JWT
+    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
+
+    // Redis Reactive
+    implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
+
+    // BCrypt
+    implementation("org.springframework.security:spring-security-crypto")
+
+    // JDBC for JOOQ
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
+
     // JOOQ 기본 런타임 라이브러리
     implementation("org.jooq:jooq:$jooqVersion")
     implementation("org.springframework.boot:spring-boot-starter-jooq") // jooq, Spring과 통합하는 경우 추가
