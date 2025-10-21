@@ -26,10 +26,10 @@ repositories {
 }
 
 extra["snippetsDir"] = file("build/generated-snippets")
+val jooqVersion = "3.17.23"
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-jooq")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
@@ -44,14 +44,14 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // JOOQ 기본 런타임 라이브러리
-    implementation("org.jooq:jooq:3.17.23")
+    implementation("org.jooq:jooq:$jooqVersion")
     implementation("org.springframework.boot:spring-boot-starter-jooq") // jooq, Spring과 통합하는 경우 추가
 
     // JOOQ 코드 생성 관련 라이브러리
-    jooqGenerator("org.jooq:jooq-meta:3.17.23")
-    jooqGenerator("org.jooq:jooq-codegen:3.17.23")
+    jooqGenerator("org.jooq:jooq-meta:$jooqVersion")
+    jooqGenerator("org.jooq:jooq-codegen:$jooqVersion")
     // DDLDatabase 지원 라이브러리 추가
-    jooqGenerator("org.jooq:jooq-meta-extensions:3.17.23")
+    jooqGenerator("org.jooq:jooq-meta-extensions:$jooqVersion")
 }
 
 kotlin {
@@ -164,7 +164,7 @@ detekt {
 }
 
 jooq {
-    version.set("3.17.23")
+    version.set(jooqVersion)
 
     configurations {
         create("main") {
