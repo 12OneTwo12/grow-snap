@@ -85,6 +85,13 @@ TikTok, 인스타그램 숏츠처럼 재미있지만, 스크롤하다 보면 어
 
 ---
 
+## 📚 문서
+
+- [요구사항 명세서](docs/요구사항명세서.md)
+- [Git Convention](docs/GIT_CONVENTION.md) - 커밋 메시지 및 브랜치 네이밍 규칙
+
+---
+
 ## 📄 라이선스
 
 MIT License (예정)
