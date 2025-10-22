@@ -1,6 +1,5 @@
 package me.onetwo.growsnap.domain.user.service
 
-import me.onetwo.growsnap.domain.user.exception.DuplicateEmailException
 import me.onetwo.growsnap.domain.user.exception.UserNotFoundException
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
