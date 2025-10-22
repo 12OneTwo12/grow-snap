@@ -46,6 +46,11 @@ TikTok, 인스타그램 숏츠처럼 재미있지만, 스크롤하다 보면 어
 - **MySQL**
 - **Apache Kafka**
 - **AWS** (S3, CloudFront)
+- **JOOQ** (타입 안전 SQL 빌더)
+- **Redis** (캐싱, Refresh Token 관리)
+- **OAuth 2.0**
+- **JWT** (인증)
+- **Spring Security**
 
 ### 프론트엔드
 - **React Native** (웹/앱 크로스 플랫폼)
