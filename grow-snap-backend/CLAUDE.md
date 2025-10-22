@@ -35,6 +35,62 @@
 ### 5. Git Convention
 - 커밋 : /docs/GIT_CONVENTION.md 준수
 
+### 6. Soft Delete 패턴 (필수)
+- **모든 엔티티는 Soft Delete 패턴 사용**
+- 물리적 삭제 금지, 논리적 삭제(Soft Delete)만 허용
+- `deletedAt: LocalDateTime?` 필드 필수
+- 조회 쿼리는 항상 `deletedAt IS NULL` 조건 포함
+- 삭제 API는 `deletedAt = LocalDateTime.now()` 업데이트로 구현
+
+#### Soft Delete 구현 예시
+
+```kotlin
+// ✅ GOOD: Soft Delete가 적용된 엔티티
+data class User(
+    val id: UUID,
+    val email: String,
+    val name: String,
+    val createdAt: LocalDateTime,
+    val updatedAt: LocalDateTime,
+    val deletedAt: LocalDateTime? = null  // ✅ Soft Delete 필드
+)
+
+// ✅ GOOD: 조회 시 삭제된 데이터 제외
+fun findActiveUsers(): List<User> {
+    return dslContext
+        .select(USER.asterisk())
+        .from(USER)
+        .where(USER.DELETED_AT.isNull)  // ✅ 삭제된 데이터 제외
+        .fetchInto(User::class.java)
+}
+
+// ✅ GOOD: 삭제는 UPDATE로 구현
+fun deleteUser(userId: UUID) {
+    dslContext
+        .update(USER)
+        .set(USER.DELETED_AT, LocalDateTime.now())  // ✅ Soft Delete
+        .set(USER.UPDATED_AT, LocalDateTime.now())
+        .where(USER.ID.eq(userId))
+        .and(USER.DELETED_AT.isNull)  // 이미 삭제된 데이터는 제외
+        .execute()
+}
+
+// ❌ BAD: 물리적 삭제
+fun deleteUser(userId: UUID) {
+    dslContext
+        .deleteFrom(USER)
+        .where(USER.ID.eq(userId))
+        .execute()  // ❌ 물리적 삭제 금지!
+}
+```
+
+#### Soft Delete 체크리스트
+
+- [ ] **모든 엔티티에 `deletedAt` 필드 존재**
+- [ ] **조회 쿼리에 `deletedAt IS NULL` 조건 포함**
+- [ ] **삭제 API는 UPDATE로 구현**
+- [ ] **삭제된 데이터는 복구 가능하도록 보관**
+
 ---
 
 ## 📂 프로젝트 구조 (MVC 패턴)
@@ -971,6 +1027,7 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 9. **MVC 패턴**: Controller → Service → Repository
 10. **성능 vs 가독성**: 가독성 우선, 필요시 최적화
 11. **RESTful API**: 동사 금지, 적절한 HTTP 메서드/상태 코드
+12. **Soft Delete**: 모든 엔티티에 deletedAt 필드 필수, 물리적 삭제 금지
 
 ---
 
