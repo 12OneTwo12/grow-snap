@@ -1091,6 +1091,7 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 
 ---
 
-**작성일**: 2024-10-22
+**작성일**: 2025-10-22
 **버전**: 1.0.0
 **대상**: Claude (AI 개발 어시스턴트)
+**작성자**: @12OneTwo12
