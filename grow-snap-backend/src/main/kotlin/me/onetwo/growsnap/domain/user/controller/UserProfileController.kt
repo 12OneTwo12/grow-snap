@@ -2,11 +2,15 @@ package me.onetwo.growsnap.domain.user.controller
 
 import jakarta.validation.Valid
 import me.onetwo.growsnap.domain.user.dto.CreateProfileRequest
+import me.onetwo.growsnap.domain.user.dto.ImageUploadResponse
 import me.onetwo.growsnap.domain.user.dto.NicknameCheckResponse
 import me.onetwo.growsnap.domain.user.dto.UpdateProfileRequest
 import me.onetwo.growsnap.domain.user.dto.UserProfileResponse
 import me.onetwo.growsnap.domain.user.service.UserProfileService
+import me.onetwo.growsnap.infrastructure.storage.ImageUploadService
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.http.codec.multipart.FilePart
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -15,7 +19,7 @@ import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
-import org.springframework.web.bind.annotation.ResponseStatus
+import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
 import java.util.UUID
@@ -28,7 +32,8 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1/profiles")
 class UserProfileController(
-    private val userProfileService: UserProfileService
+    private val userProfileService: UserProfileService,
+    private val imageUploadService: ImageUploadService
 ) {
 
     /**
@@ -39,11 +44,10 @@ class UserProfileController(
      * @return 생성된 프로필 정보
      */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
     fun createProfile(
         @RequestAttribute userId: UUID,
         @Valid @RequestBody request: CreateProfileRequest
-    ): Mono<UserProfileResponse> {
+    ): Mono<ResponseEntity<UserProfileResponse>> {
         return Mono.fromCallable {
             val profile = userProfileService.createProfile(
                 userId = userId,
@@ -51,7 +55,7 @@ class UserProfileController(
                 profileImageUrl = request.profileImageUrl,
                 bio = request.bio
             )
-            UserProfileResponse.from(profile)
+            ResponseEntity.status(HttpStatus.CREATED).body(UserProfileResponse.from(profile))
         }
     }
 
@@ -64,10 +68,10 @@ class UserProfileController(
     @GetMapping("/me")
     fun getMyProfile(
         @RequestAttribute userId: UUID
-    ): Mono<UserProfileResponse> {
+    ): Mono<ResponseEntity<UserProfileResponse>> {
         return Mono.fromCallable {
             val profile = userProfileService.getProfileByUserId(userId)
-            UserProfileResponse.from(profile)
+            ResponseEntity.ok(UserProfileResponse.from(profile))
         }
     }
 
@@ -80,10 +84,10 @@ class UserProfileController(
     @GetMapping("/{targetUserId}")
     fun getProfileByUserId(
         @PathVariable targetUserId: UUID
-    ): Mono<UserProfileResponse> {
+    ): Mono<ResponseEntity<UserProfileResponse>> {
         return Mono.fromCallable {
             val profile = userProfileService.getProfileByUserId(targetUserId)
-            UserProfileResponse.from(profile)
+            ResponseEntity.ok(UserProfileResponse.from(profile))
         }
     }
 
@@ -96,10 +100,10 @@ class UserProfileController(
     @GetMapping("/nickname/{nickname}")
     fun getProfileByNickname(
         @PathVariable nickname: String
-    ): Mono<UserProfileResponse> {
+    ): Mono<ResponseEntity<UserProfileResponse>> {
         return Mono.fromCallable {
             val profile = userProfileService.getProfileByNickname(nickname)
-            UserProfileResponse.from(profile)
+            ResponseEntity.ok(UserProfileResponse.from(profile))
         }
     }
 
@@ -114,7 +118,7 @@ class UserProfileController(
     fun updateProfile(
         @RequestAttribute userId: UUID,
         @Valid @RequestBody request: UpdateProfileRequest
-    ): Mono<UserProfileResponse> {
+    ): Mono<ResponseEntity<UserProfileResponse>> {
         return Mono.fromCallable {
             val profile = userProfileService.updateProfile(
                 userId = userId,
@@ -122,7 +126,7 @@ class UserProfileController(
                 profileImageUrl = request.profileImageUrl,
                 bio = request.bio
             )
-            UserProfileResponse.from(profile)
+            ResponseEntity.ok(UserProfileResponse.from(profile))
         }
     }
 
@@ -135,10 +139,45 @@ class UserProfileController(
     @GetMapping("/check/nickname/{nickname}")
     fun checkNickname(
         @PathVariable nickname: String
-    ): Mono<NicknameCheckResponse> {
+    ): Mono<ResponseEntity<NicknameCheckResponse>> {
         return Mono.fromCallable {
             val isDuplicated = userProfileService.isNicknameDuplicated(nickname)
-            NicknameCheckResponse(nickname, isDuplicated)
+            ResponseEntity.ok(NicknameCheckResponse(nickname, isDuplicated))
         }
+    }
+
+    /**
+     * 프로필 이미지 업로드
+     *
+     * 사용자의 프로필 이미지를 업로드합니다.
+     * 이미지는 리사이징된 후 S3에 저장되며, 업로드된 이미지 URL을 반환합니다.
+     *
+     * @param userId 사용자 ID (인증된 사용자)
+     * @param filePart 업로드할 이미지 파일
+     * @return 업로드된 이미지 URL
+     */
+    @PostMapping("/image")
+    fun uploadProfileImage(
+        @RequestAttribute userId: UUID,
+        @RequestPart("file") filePart: Mono<FilePart>
+    ): Mono<ResponseEntity<ImageUploadResponse>> {
+        return filePart
+            .flatMap { file ->
+                // FilePart에서 바이트 배열과 Content-Type 추출
+                file.content()
+                    .map { dataBuffer ->
+                        val bytes = ByteArray(dataBuffer.readableByteCount())
+                        dataBuffer.read(bytes)
+                        bytes
+                    }
+                    .reduce { acc, bytes -> acc + bytes }
+                    .flatMap { imageBytes ->
+                        val contentType = file.headers().contentType?.toString() ?: "application/octet-stream"
+                        imageUploadService.uploadProfileImage(userId, imageBytes, contentType)
+                    }
+            }
+            .map { imageUrl ->
+                ResponseEntity.status(HttpStatus.CREATED).body(ImageUploadResponse(imageUrl))
+            }
     }
 }

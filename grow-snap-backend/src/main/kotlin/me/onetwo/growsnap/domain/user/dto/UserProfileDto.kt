@@ -73,3 +73,10 @@ data class NicknameCheckResponse(
     val nickname: String,
     val isDuplicated: Boolean
 )
+
+/**
+ * 이미지 업로드 응답 DTO
+ */
+data class ImageUploadResponse(
+    val imageUrl: String
+)

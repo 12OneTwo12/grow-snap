@@ -12,6 +12,7 @@ import me.onetwo.growsnap.domain.user.exception.DuplicateNicknameException
 import me.onetwo.growsnap.domain.user.exception.UserProfileNotFoundException
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.service.UserProfileService
+import me.onetwo.growsnap.infrastructure.storage.ImageUploadService
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -41,6 +42,9 @@ class UserProfileControllerTest {
 
     @MockkBean
     private lateinit var userProfileService: UserProfileService
+
+    @MockkBean
+    private lateinit var imageUploadService: ImageUploadService
 
     private val testUserId = UUID.randomUUID()
     private val testProfile = UserProfile(
