@@ -43,7 +43,7 @@ class FollowServiceTest {
         followRepository = mockk()
         userService = mockk()
         userProfileService = mockk()
-        followService = FollowService(followRepository, userService, userProfileService)
+        followService = FollowServiceImpl(followRepository, userService, userProfileService)
 
         followerUser = User(
             id = UUID.randomUUID(),
