@@ -47,20 +47,9 @@ class SecurityConfig(
             .authorizeExchange { authorize ->
                 authorize
                     // 인증이 필요 없는 공개 API
-                    .pathMatchers(
-                        "/api/v1/auth/**",
-                        "/oauth2/**",
-                        "/login/**",
-                        "/error"
-                    ).permitAll()
+                    .pathMatchers(*PublicApiPaths.AUTH_ENDPOINTS).permitAll()
                     // 조회 전용 공개 API (GET 메서드만 허용)
-                    .pathMatchers(org.springframework.http.HttpMethod.GET,
-                        "/api/v1/users/*",                          // 사용자 ID로 조회
-                        "/api/v1/profiles/*",                       // 프로필 ID로 조회 (UUID)
-                        "/api/v1/profiles/nickname/*",              // 닉네임으로 프로필 조회
-                        "/api/v1/profiles/check/nickname/*",        // 닉네임 중복 확인
-                        "/api/v1/follows/stats/*"                   // 팔로우 통계 조회
-                    ).permitAll()
+                    .pathMatchers(PublicApiPaths.GetOnly.METHOD, *PublicApiPaths.GetOnly.PATHS).permitAll()
                     // 나머지는 인증 필요
                     .anyExchange().authenticated()
             }
