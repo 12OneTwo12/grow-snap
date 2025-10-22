@@ -30,10 +30,10 @@
 - **Given-When-Then 주석 필수**: 모든 테스트에 명시적으로 작성
 - **DisplayName 필수**: 한글로 명확한 시나리오 설명 (예: "유효한 요청으로 비디오 생성 시, 201과 비디오 정보를 반환한다")
 - **테스트 완료 후 빌드/테스트 실행**: 모든 테스트가 통과해야만 작업 완료
+- **통합, 단위 테스트 모두 작성할 것 ( 비중은 단위 테스트: 70%, 통합 테스트: 30%)**
 
 ### 5. Git Convention
-- 커밋 메시지: `feat(video): Add video upload API`
-- 브랜치: `feature/video-upload`, `fix/auth-bug`
+- 커밋 : /docs/GIT_CONVENTION.md 준수
 
 ---
 
@@ -72,13 +72,15 @@ grow-snap-backend/
 ```
 1. 📝 테스트 코드 작성 (Controller + Service)
    ↓
-2. ✅ 테스트 통과하는 최소 코드 작성
+2. ✅ 테스트 통과하는 최소 코드 작성 (SOLID 원칙 준수)
    ↓
 3. 🔧 리팩토링 (SOLID 원칙 적용)
    ↓
 4. 📚 KDoc + REST Docs 작성
    ↓
-5. ✨ 커밋 (feat(scope): message)
+5. 📚 빌드 및 테스트 ( 모두 정상이여야함, 일부 실패 용인하지 않음 )
+   ↓
+6. ✨ 커밋 (feat(scope): message)
 ```
 
 ---
@@ -217,7 +219,6 @@ class VideoServiceImplTest {
  *
  * @property videoRepository 비디오 데이터베이스 액세스를 위한 레포지토리
  * @property s3Service S3 파일 업로드 URL 생성 서비스
- * @since 1.0.0
  */
 @Service
 class VideoServiceImpl(
@@ -299,32 +300,8 @@ GET    /api/v1/videos/get/{id}     # 불필요한 동사
 
 ### 응답 형식
 
-```kotlin
-// 성공 응답
-data class ApiResponse<T>(
-    val success: Boolean = true,
-    val data: T,
-    val timestamp: Instant = Instant.now()
-)
-
-// 에러 응답
-data class ErrorResponse(
-    val success: Boolean = false,
-    val code: String,
-    val message: String,
-    val timestamp: Instant = Instant.now(),
-    val details: Map<String, Any>? = null
-)
-
-// 페이지네이션
-data class PageResponse<T>(
-    val content: List<T>,
-    val page: Int,
-    val size: Int,
-    val totalElements: Long,
-    val totalPages: Int,
-    val hasNext: Boolean
-)
+```
+org.springframework.http.ResponseEntity 사용할것
 ```
 
 ---

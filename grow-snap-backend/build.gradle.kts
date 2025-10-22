@@ -41,6 +41,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.springframework.restdocs:spring-restdocs-webtestclient")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("io.projectreactor:reactor-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
     // MockK for Kotlin testing
@@ -107,10 +108,6 @@ tasks.register<Copy>("copyDocument") {
     dependsOn(tasks.asciidoctor)
     from(file("build/docs/asciidoc"))
     into(file("src/main/resources/static/docs"))
-}
-
-tasks.named("processResources") {
-    dependsOn("copyDocument")
 }
 
 tasks.register<Copy>("buildDocument") {
