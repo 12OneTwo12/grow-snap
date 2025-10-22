@@ -184,6 +184,10 @@ detekt {
     ignoreFailures = true // detekt 빌드시 실패 ignore 처리
 }
 
+// JOOQ 설정
+// Note: JOOQ Gradle 플러그인의 XML 스키마 검증 경고는 무시해도 됩니다.
+// 이는 플러그인의 알려진 이슈이며 실제 코드 생성과 빌드에는 영향이 없습니다.
+// https://github.com/etiennestuder/gradle-jooq-plugin/issues
 jooq {
     version.set(jooqVersion)
 
@@ -218,8 +222,12 @@ jooq {
                     }
 
                     generate.apply {
-                        isPojos = true  // Kotlin 데이터 클래스로 생성
-                        isDaos = true   // DAO 클래스 생성
+                        // 도메인 모델을 별도로 관리하므로 JOOQ POJO/DAO는 생성하지 않음
+                        isPojos = false
+                        isDaos = false
+                        isRecords = true
+                        isFluentSetters = false
+                        isJavaTimeTypes = true
                     }
 
                     target.apply {
