@@ -8,7 +8,6 @@ import org.springframework.web.server.ServerWebExchange
 import org.springframework.web.server.WebFilter
 import org.springframework.web.server.WebFilterChain
 import reactor.core.publisher.Mono
-import java.util.UUID
 
 /**
  * JWT 인증 WebFilter
@@ -18,9 +17,12 @@ import java.util.UUID
  *
  * ### 처리 흐름
  * 1. Authorization 헤더에서 "Bearer {token}" 추출
- * 2. JWT 유효성 검증 (JwtTokenProvider 사용)
- * 3. 유효한 경우: userId를 Request attribute에 저장 + SecurityContext 설정
- * 4. 유효하지 않은 경우: 401 Unauthorized 반환
+ * 2. Token이 있으면 → JWT 유효성 검증 후 SecurityContext에 저장
+ * 3. Token이 없으면 → pass (Spring Security가 .authenticated() 규칙으로 판단)
+ *
+ * ### 역할 분리
+ * - **JwtAuthenticationWebFilter**: JWT 추출 및 검증만 담당
+ * - **Spring Security**: `.pathMatchers().permitAll()` / `.authenticated()` 규칙으로 인가 판단
  *
  * @property jwtTokenProvider JWT 토큰 검증 Provider
  */
@@ -31,38 +33,23 @@ class JwtAuthenticationWebFilter(
 
     companion object {
         private const val BEARER_PREFIX = "Bearer "
-
-        /**
-         * 인증이 필요 없는 공개 경로
-         */
-        private val PUBLIC_PATHS = listOf(
-            "/api/v1/auth/",
-            "/oauth2/",
-            "/login/",
-            "/error"
-        )
     }
 
     /**
      * JWT 인증 필터 로직
+     *
+     * Token이 있으면 검증하고 SecurityContext에 저장합니다.
+     * Token이 없으면 pass하여 Spring Security가 최종 판단하도록 합니다.
      *
      * @param exchange ServerWebExchange
      * @param chain WebFilterChain
      * @return Mono<Void>
      */
     override fun filter(exchange: ServerWebExchange, chain: WebFilterChain): Mono<Void> {
-        val path = exchange.request.uri.path
-
-        // 공개 경로는 JWT 검증 생략
-        if (PUBLIC_PATHS.any { path.startsWith(it) }) {
-            return chain.filter(exchange)
-        }
-
         // Authorization 헤더에서 JWT 추출
         val token = extractToken(exchange)
 
-        // Token이 없으면 SecurityConfig의 .permitAll() 규칙에 따라 통과시킴
-        // (공개 API는 인증 없이 접근 가능)
+        // Token이 없으면 pass (Spring Security가 .authenticated() 규칙으로 판단)
         if (token == null) {
             return chain.filter(exchange)
         }
