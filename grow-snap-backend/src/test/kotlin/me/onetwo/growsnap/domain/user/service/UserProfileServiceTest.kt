@@ -13,6 +13,7 @@ import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.model.UserRole
 import me.onetwo.growsnap.domain.user.repository.UserProfileRepository
+import me.onetwo.growsnap.infrastructure.storage.ImageUploadService
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -29,6 +30,7 @@ class UserProfileServiceTest {
 
     private lateinit var userProfileRepository: UserProfileRepository
     private lateinit var userService: UserService
+    private lateinit var imageUploadService: ImageUploadService
     private lateinit var userProfileService: UserProfileService
 
     private lateinit var testUser: User
@@ -38,7 +40,8 @@ class UserProfileServiceTest {
     fun setUp() {
         userProfileRepository = mockk()
         userService = mockk()
-        userProfileService = UserProfileServiceImpl(userProfileRepository, userService)
+        imageUploadService = mockk()
+        userProfileService = UserProfileServiceImpl(userProfileRepository, userService, imageUploadService)
 
         val testUserId = UUID.randomUUID()
 

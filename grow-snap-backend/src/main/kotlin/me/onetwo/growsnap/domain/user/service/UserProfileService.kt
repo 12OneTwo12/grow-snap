@@ -1,6 +1,8 @@
 package me.onetwo.growsnap.domain.user.service
 
 import me.onetwo.growsnap.domain.user.model.UserProfile
+import org.springframework.http.codec.multipart.FilePart
+import reactor.core.publisher.Mono
 import java.util.UUID
 
 /**
@@ -108,4 +110,21 @@ interface UserProfileService {
      * @throws me.onetwo.growsnap.domain.user.exception.UserProfileNotFoundException 프로필을 찾을 수 없는 경우
      */
     fun decrementFollowingCount(userId: UUID): UserProfile
+
+    /**
+     * 프로필 이미지 업로드
+     *
+     * FilePart를 받아서 이미지를 처리하고 S3에 업로드합니다.
+     *
+     * ### 처리 흐름
+     * 1. FilePart에서 바이트 배열과 Content-Type 추출
+     * 2. ImageUploadService를 통해 S3 업로드
+     * 3. 업로드된 이미지 URL 반환
+     *
+     * @param userId 사용자 ID
+     * @param filePart 업로드할 이미지 파일
+     * @return 업로드된 이미지 URL을 담은 Mono
+     * @throws IllegalArgumentException 이미지 유효성 검증 실패 시
+     */
+    fun uploadProfileImage(userId: UUID, filePart: FilePart): Mono<String>
 }

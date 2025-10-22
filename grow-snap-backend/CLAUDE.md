@@ -58,12 +58,159 @@ grow-snap-backend/
         └── redis/                # Redis
 ```
 
-### 계층별 역할
+### 계층별 역할 (MVC Layer Responsibilities)
 
-**Controller**: HTTP 요청/응답, Bean Validation, DTO 변환
-**Service**: 비즈니스 로직, 트랜잭션 관리
-**Repository**: 데이터베이스 CRUD (JOOQ 사용)
-**Model**: 도메인 엔티티
+> **중요**: 각 계층은 자신의 책임에만 집중해야 합니다. 계층 간 책임을 명확히 분리하지 않으면 유지보수가 어려워지고 테스트가 복잡해집니다.
+
+#### Controller (컨트롤러)
+
+**역할**: HTTP 요청/응답 처리만 담당
+
+- ✅ HTTP 요청 수신 및 파라미터 추출
+- ✅ Bean Validation (요청 검증)
+- ✅ Service 호출 (비즈니스 로직 위임)
+- ✅ HTTP 응답 생성 (상태 코드, 헤더, 바디)
+- ✅ DTO 변환 (Entity → Response DTO)
+- ❌ 비즈니스 로직 처리 금지
+- ❌ 데이터베이스 접근 금지
+- ❌ 복잡한 데이터 처리 금지 (FilePart 처리, 파일 변환 등)
+
+#### Service (서비스)
+
+**역할**: 비즈니스 로직 처리
+
+- ✅ 비즈니스 로직 구현
+- ✅ 트랜잭션 관리 (@Transactional)
+- ✅ 복잡한 데이터 처리 (FilePart 처리, 이미지 변환 등)
+- ✅ 다른 서비스 호출 (서비스 간 조율)
+- ✅ Repository 호출 (데이터베이스 접근)
+- ✅ 예외 처리 및 변환
+- ❌ HTTP 요청/응답 처리 금지
+- ❌ HTTP 상태 코드 결정 금지
+
+#### Repository (레포지토리)
+
+**역할**: 데이터베이스 CRUD
+
+- ✅ 데이터베이스 쿼리 실행 (JOOQ 사용)
+- ✅ Entity 저장/조회/수정/삭제
+- ❌ 비즈니스 로직 금지
+- ❌ 다른 Repository 호출 최소화
+
+#### Model (모델)
+
+**역할**: 도메인 엔티티
+
+- ✅ 도메인 객체 표현
+- ✅ 간단한 비즈니스 규칙 (validation, 계산)
+
+---
+
+### 계층별 책임 예시: 프로필 이미지 업로드
+
+#### ❌ 잘못된 설계 (Controller에 비즈니스 로직)
+
+```kotlin
+// ❌ BAD: Controller가 FilePart 처리 (비즈니스 로직)를 수행
+@RestController
+class UserProfileController(
+    private val imageUploadService: ImageUploadService  // Infrastructure 계층 직접 의존
+) {
+    @PostMapping("/image")
+    fun uploadProfileImage(
+        @RequestAttribute userId: UUID,
+        @RequestPart("file") filePart: Mono<FilePart>
+    ): Mono<ResponseEntity<ImageUploadResponse>> {
+        // ❌ Controller가 FilePart 처리 - 비즈니스 로직!
+        return filePart.content()
+            .map { dataBuffer ->
+                val bytes = ByteArray(dataBuffer.readableByteCount())
+                dataBuffer.read(bytes)
+                bytes
+            }
+            .reduce { acc, bytes -> acc + bytes }
+            .flatMap { imageBytes ->
+                val contentType = filePart.headers().contentType?.toString() ?: "application/octet-stream"
+                imageUploadService.uploadProfileImage(userId, imageBytes, contentType)
+            }
+            .map { imageUrl ->
+                ResponseEntity.status(HttpStatus.CREATED).body(ImageUploadResponse(imageUrl))
+            }
+    }
+}
+```
+
+**문제점**:
+- Controller가 FilePart 처리 (바이트 배열 변환, Content-Type 추출) 수행
+- Controller가 Infrastructure 계층 (ImageUploadService)에 직접 의존
+- 비즈니스 로직이 Controller에 있어 재사용 불가능
+- 테스트가 복잡해짐 (HTTP 계층과 비즈니스 로직이 섞임)
+
+#### ✅ 올바른 설계 (Service에 비즈니스 로직)
+
+```kotlin
+// ✅ GOOD: Controller는 HTTP 처리만, Service에 비즈니스 로직 위임
+@RestController
+class UserProfileController(
+    private val userProfileService: UserProfileService  // Service 계층 의존
+) {
+    @PostMapping("/image")
+    fun uploadProfileImage(
+        @RequestAttribute userId: UUID,
+        @RequestPart("file") filePart: Mono<FilePart>
+    ): Mono<ResponseEntity<ImageUploadResponse>> {
+        // ✅ Service에 비즈니스 로직 위임
+        return filePart
+            .flatMap { file ->
+                userProfileService.uploadProfileImage(userId, file)
+            }
+            .map { imageUrl ->
+                ResponseEntity.status(HttpStatus.CREATED).body(ImageUploadResponse(imageUrl))
+            }
+    }
+}
+
+// ✅ GOOD: Service가 비즈니스 로직 처리
+@Service
+class UserProfileServiceImpl(
+    private val userProfileRepository: UserProfileRepository,
+    private val imageUploadService: ImageUploadService
+) : UserProfileService {
+    override fun uploadProfileImage(userId: UUID, filePart: FilePart): Mono<String> {
+        // ✅ FilePart 처리 로직은 Service에 위치
+        return filePart.content()
+            .map { dataBuffer ->
+                val bytes = ByteArray(dataBuffer.readableByteCount())
+                dataBuffer.read(bytes)
+                bytes
+            }
+            .reduce { acc, bytes -> acc + bytes }
+            .flatMap { imageBytes ->
+                val contentType = filePart.headers().contentType?.toString() ?: "application/octet-stream"
+                imageUploadService.uploadProfileImage(userId, imageBytes, contentType)
+            }
+    }
+}
+```
+
+**장점**:
+- Controller는 HTTP 처리만 담당 (단일 책임)
+- Service에 비즈니스 로직이 있어 재사용 가능
+- 테스트가 간단해짐 (Controller 테스트는 Service를 mock, Service 테스트는 단위 테스트)
+- 계층 간 의존성이 명확함 (Controller → Service → Infrastructure)
+
+---
+
+### 계층별 책임 체크리스트
+
+**코드 작성 전 반드시 확인**:
+
+- [ ] **Controller**: HTTP 요청/응답 처리만 하는가? 비즈니스 로직이 없는가?
+- [ ] **Service**: 비즈니스 로직이 Service에 있는가? Controller에 비즈니스 로직이 없는가?
+- [ ] **Repository**: 데이터베이스 쿼리만 수행하는가? 비즈니스 로직이 없는가?
+- [ ] **테스트**: 각 계층을 독립적으로 테스트할 수 있는가?
+
+---
 
 ### 서비스 간 의존성 패턴 (Service-to-Service Dependency)
 

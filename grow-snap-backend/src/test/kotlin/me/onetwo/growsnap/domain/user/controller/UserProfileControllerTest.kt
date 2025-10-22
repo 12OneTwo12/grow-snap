@@ -12,20 +12,23 @@ import me.onetwo.growsnap.domain.user.exception.DuplicateNicknameException
 import me.onetwo.growsnap.domain.user.exception.UserProfileNotFoundException
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.service.UserProfileService
-import me.onetwo.growsnap.infrastructure.storage.ImageUploadService
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
+import org.springframework.core.io.ClassPathResource
 import org.springframework.http.MediaType
+import org.springframework.http.client.MultipartBodyBuilder
 import org.springframework.restdocs.operation.preprocess.Preprocessors.*
 import org.springframework.restdocs.payload.PayloadDocumentation.*
 import org.springframework.restdocs.request.RequestDocumentation.*
 import org.springframework.restdocs.webtestclient.WebTestClientRestDocumentation.document
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
+import org.springframework.web.reactive.function.BodyInserters
+import reactor.core.publisher.Mono
 
 /**
  * UserProfileController 통합 테스트 + Spring Rest Docs
@@ -42,9 +45,6 @@ class UserProfileControllerTest {
 
     @MockkBean
     private lateinit var userProfileService: UserProfileService
-
-    @MockkBean
-    private lateinit var imageUploadService: ImageUploadService
 
     private val testUserId = UUID.randomUUID()
     private val testProfile = UserProfile(
@@ -351,5 +351,92 @@ class UserProfileControllerTest {
             .expectStatus().isOk
             .expectBody()
             .jsonPath("$.isDuplicated").isEqualTo(false)
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 업로드 성공")
+    fun uploadProfileImage_Success() {
+        // Given: 테스트용 이미지 파일 생성
+        val testImageBytes = createTestImage()
+        val uploadedImageUrl = "https://test-bucket.s3.amazonaws.com/profile-images/$testUserId/profile_${testUserId}_123456.jpg"
+
+        every {
+            userProfileService.uploadProfileImage(testUserId, any())
+        } returns Mono.just(uploadedImageUrl)
+
+        // When & Then: Multipart 파일 업로드
+        val multipartBodyBuilder = MultipartBodyBuilder()
+        multipartBodyBuilder.part("file", testImageBytes)
+            .contentType(MediaType.IMAGE_JPEG)
+            .filename("test-profile.jpg")
+
+        webTestClient.post()
+            .uri("/api/v1/profiles/image")
+            .header("X-User-Id", testUserId.toString())
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
+            .exchange()
+            .expectStatus().isCreated
+            .expectBody()
+            .jsonPath("$.imageUrl").isEqualTo(uploadedImageUrl)
+            .consumeWith(
+                document(
+                    "profile-upload-image",
+                    preprocessRequest(prettyPrint()),
+                    preprocessResponse(prettyPrint()),
+                    responseFields(
+                        fieldWithPath("imageUrl").description("업로드된 이미지 URL (S3)")
+                    )
+                )
+            )
+
+        verify(exactly = 1) {
+            userProfileService.uploadProfileImage(testUserId, any())
+        }
+    }
+
+    @Test
+    @DisplayName("프로필 이미지 업로드 실패 - 잘못된 파일 형식")
+    fun uploadProfileImage_InvalidFileType() {
+        // Given: 잘못된 파일 형식 (text/plain)
+        val invalidFile = "invalid file content".toByteArray()
+
+        every {
+            userProfileService.uploadProfileImage(testUserId, any())
+        } returns Mono.error(IllegalArgumentException("Unsupported image type"))
+
+        // When & Then
+        val multipartBodyBuilder = MultipartBodyBuilder()
+        multipartBodyBuilder.part("file", invalidFile)
+            .contentType(MediaType.TEXT_PLAIN)
+            .filename("test.txt")
+
+        webTestClient.post()
+            .uri("/api/v1/profiles/image")
+            .header("X-User-Id", testUserId.toString())
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
+            .exchange()
+            .expectStatus().is5xxServerError
+    }
+
+    /**
+     * 테스트용 JPEG 이미지 바이트 배열 생성
+     */
+    private fun createTestImage(): ByteArray {
+        val bufferedImage = java.awt.image.BufferedImage(
+            100,
+            100,
+            java.awt.image.BufferedImage.TYPE_INT_RGB
+        )
+
+        val graphics = bufferedImage.createGraphics()
+        graphics.color = java.awt.Color.BLUE
+        graphics.fillRect(0, 0, 100, 100)
+        graphics.dispose()
+
+        val outputStream = java.io.ByteArrayOutputStream()
+        javax.imageio.ImageIO.write(bufferedImage, "jpg", outputStream)
+        return outputStream.toByteArray()
     }
 }

@@ -4,8 +4,11 @@ import me.onetwo.growsnap.domain.user.exception.DuplicateNicknameException
 import me.onetwo.growsnap.domain.user.exception.UserProfileNotFoundException
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.repository.UserProfileRepository
+import me.onetwo.growsnap.infrastructure.storage.ImageUploadService
+import org.springframework.http.codec.multipart.FilePart
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import reactor.core.publisher.Mono
 import java.util.UUID
 
 /**
@@ -15,12 +18,14 @@ import java.util.UUID
  *
  * @property userProfileRepository 사용자 프로필 Repository
  * @property userService 사용자 서비스 (사용자 존재 여부 확인용)
+ * @property imageUploadService 이미지 업로드 서비스
  */
 @Service
 @Transactional(readOnly = true)
 class UserProfileServiceImpl(
     private val userProfileRepository: UserProfileRepository,
-    private val userService: UserService
+    private val userService: UserService,
+    private val imageUploadService: ImageUploadService
 ) : UserProfileService {
 
     /**
@@ -188,5 +193,35 @@ class UserProfileServiceImpl(
             followingCount = maxOf(0, profile.followingCount - 1)
         )
         return userProfileRepository.update(updatedProfile)
+    }
+
+    /**
+     * 프로필 이미지 업로드
+     *
+     * FilePart를 받아서 이미지를 처리하고 S3에 업로드합니다.
+     *
+     * ### 처리 흐름
+     * 1. FilePart에서 바이트 배열과 Content-Type 추출
+     * 2. ImageUploadService를 통해 S3 업로드
+     * 3. 업로드된 이미지 URL 반환
+     *
+     * @param userId 사용자 ID
+     * @param filePart 업로드할 이미지 파일
+     * @return 업로드된 이미지 URL을 담은 Mono
+     * @throws IllegalArgumentException 이미지 유효성 검증 실패 시
+     */
+    override fun uploadProfileImage(userId: UUID, filePart: FilePart): Mono<String> {
+        // FilePart에서 바이트 배열과 Content-Type 추출
+        return filePart.content()
+            .map { dataBuffer ->
+                val bytes = ByteArray(dataBuffer.readableByteCount())
+                dataBuffer.read(bytes)
+                bytes
+            }
+            .reduce { acc, bytes -> acc + bytes }
+            .flatMap { imageBytes ->
+                val contentType = filePart.headers().contentType?.toString() ?: "application/octet-stream"
+                imageUploadService.uploadProfileImage(userId, imageBytes, contentType)
+            }
     }
 }

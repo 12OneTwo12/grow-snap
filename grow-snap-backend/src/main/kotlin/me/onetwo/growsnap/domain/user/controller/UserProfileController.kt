@@ -7,7 +7,6 @@ import me.onetwo.growsnap.domain.user.dto.NicknameCheckResponse
 import me.onetwo.growsnap.domain.user.dto.UpdateProfileRequest
 import me.onetwo.growsnap.domain.user.dto.UserProfileResponse
 import me.onetwo.growsnap.domain.user.service.UserProfileService
-import me.onetwo.growsnap.infrastructure.storage.ImageUploadService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.multipart.FilePart
@@ -32,8 +31,7 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1/profiles")
 class UserProfileController(
-    private val userProfileService: UserProfileService,
-    private val imageUploadService: ImageUploadService
+    private val userProfileService: UserProfileService
 ) {
 
     /**
@@ -163,18 +161,7 @@ class UserProfileController(
     ): Mono<ResponseEntity<ImageUploadResponse>> {
         return filePart
             .flatMap { file ->
-                // FilePart에서 바이트 배열과 Content-Type 추출
-                file.content()
-                    .map { dataBuffer ->
-                        val bytes = ByteArray(dataBuffer.readableByteCount())
-                        dataBuffer.read(bytes)
-                        bytes
-                    }
-                    .reduce { acc, bytes -> acc + bytes }
-                    .flatMap { imageBytes ->
-                        val contentType = file.headers().contentType?.toString() ?: "application/octet-stream"
-                        imageUploadService.uploadProfileImage(userId, imageBytes, contentType)
-                    }
+                userProfileService.uploadProfileImage(userId, file)
             }
             .map { imageUrl ->
                 ResponseEntity.status(HttpStatus.CREATED).body(ImageUploadResponse(imageUrl))
