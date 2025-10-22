@@ -35,24 +35,35 @@
 ### 5. Git Convention
 - 커밋 : /docs/GIT_CONVENTION.md 준수
 
-### 6. Soft Delete 패턴 (필수)
-- **모든 엔티티는 Soft Delete 패턴 사용**
+### 6. 엔티티 Audit Trail 필드 (필수)
+- **모든 엔티티는 5가지 Audit Trail 필드 필수**
 - 물리적 삭제 금지, 논리적 삭제(Soft Delete)만 허용
-- `deletedAt: LocalDateTime?` 필드 필수
-- 조회 쿼리는 항상 `deletedAt IS NULL` 조건 포함
-- 삭제 API는 `deletedAt = LocalDateTime.now()` 업데이트로 구현
+- 데이터 변경 이력 추적을 위한 감사 필드 필수
 
-#### Soft Delete 구현 예시
+#### 필수 Audit Trail 필드
+
+모든 엔티티는 다음 5가지 필드를 반드시 포함해야 합니다:
+
+1. **createdAt**: `LocalDateTime` - 생성 시각
+2. **createdBy**: `UUID?` - 생성한 사용자 ID
+3. **updatedAt**: `LocalDateTime` - 최종 수정 시각
+4. **updatedBy**: `UUID?` - 최종 수정한 사용자 ID
+5. **deletedAt**: `LocalDateTime?` - 삭제 시각 (Soft Delete)
+
+#### Audit Trail 구현 예시
 
 ```kotlin
-// ✅ GOOD: Soft Delete가 적용된 엔티티
+// ✅ GOOD: 완전한 Audit Trail이 적용된 엔티티
 data class User(
     val id: UUID,
     val email: String,
     val name: String,
-    val createdAt: LocalDateTime,
-    val updatedAt: LocalDateTime,
-    val deletedAt: LocalDateTime? = null  // ✅ Soft Delete 필드
+    // Audit Trail 필드 (필수)
+    val createdAt: LocalDateTime = LocalDateTime.now(),
+    val createdBy: UUID? = null,
+    val updatedAt: LocalDateTime = LocalDateTime.now(),
+    val updatedBy: UUID? = null,
+    val deletedAt: LocalDateTime? = null  // Soft Delete
 )
 
 // ✅ GOOD: 조회 시 삭제된 데이터 제외
@@ -64,12 +75,40 @@ fun findActiveUsers(): List<User> {
         .fetchInto(User::class.java)
 }
 
-// ✅ GOOD: 삭제는 UPDATE로 구현
-fun deleteUser(userId: UUID) {
+// ✅ GOOD: 생성 시 createdAt, createdBy 설정
+fun createUser(userId: UUID, email: String): User {
+    return dslContext
+        .insertInto(USER)
+        .set(USER.ID, UUID.randomUUID())
+        .set(USER.EMAIL, email)
+        .set(USER.CREATED_AT, LocalDateTime.now())
+        .set(USER.CREATED_BY, userId)  // 생성자 기록
+        .set(USER.UPDATED_AT, LocalDateTime.now())
+        .set(USER.UPDATED_BY, userId)
+        .returning()
+        .fetchOne()!!
+        .into(User::class.java)
+}
+
+// ✅ GOOD: 수정 시 updatedAt, updatedBy 설정
+fun updateUser(userId: UUID, updatedBy: UUID, email: String) {
     dslContext
         .update(USER)
-        .set(USER.DELETED_AT, LocalDateTime.now())  // ✅ Soft Delete
+        .set(USER.EMAIL, email)
         .set(USER.UPDATED_AT, LocalDateTime.now())
+        .set(USER.UPDATED_BY, updatedBy)  // 수정자 기록
+        .where(USER.ID.eq(userId))
+        .and(USER.DELETED_AT.isNull)
+        .execute()
+}
+
+// ✅ GOOD: 삭제는 UPDATE로 구현 (Soft Delete)
+fun deleteUser(userId: UUID, deletedBy: UUID) {
+    dslContext
+        .update(USER)
+        .set(USER.DELETED_AT, LocalDateTime.now())
+        .set(USER.UPDATED_AT, LocalDateTime.now())
+        .set(USER.UPDATED_BY, deletedBy)  // 삭제자 기록
         .where(USER.ID.eq(userId))
         .and(USER.DELETED_AT.isNull)  // 이미 삭제된 데이터는 제외
         .execute()
@@ -84,12 +123,33 @@ fun deleteUser(userId: UUID) {
 }
 ```
 
-#### Soft Delete 체크리스트
+#### Audit Trail 체크리스트
 
-- [ ] **모든 엔티티에 `deletedAt` 필드 존재**
+- [ ] **모든 엔티티에 5가지 필드 존재**: `createdAt`, `createdBy`, `updatedAt`, `updatedBy`, `deletedAt`
 - [ ] **조회 쿼리에 `deletedAt IS NULL` 조건 포함**
-- [ ] **삭제 API는 UPDATE로 구현**
+- [ ] **생성 시 `createdAt`, `createdBy` 설정**
+- [ ] **수정 시 `updatedAt`, `updatedBy` 갱신**
+- [ ] **삭제는 UPDATE로 구현**: `deletedAt`, `updatedAt`, `updatedBy` 설정
 - [ ] **삭제된 데이터는 복구 가능하도록 보관**
+- [ ] **데이터베이스 스키마에 모든 필드 존재 및 인덱스 설정**
+
+#### 데이터베이스 스키마 예시
+
+```sql
+CREATE TABLE users (
+    id CHAR(36) PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    -- Audit Trail 필드
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    deleted_at TIMESTAMP NULL
+);
+
+-- 성능을 위한 인덱스
+CREATE INDEX idx_deleted_at ON users(deleted_at);
+```
 
 ---
 
@@ -1027,7 +1087,7 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 9. **MVC 패턴**: Controller → Service → Repository
 10. **성능 vs 가독성**: 가독성 우선, 필요시 최적화
 11. **RESTful API**: 동사 금지, 적절한 HTTP 메서드/상태 코드
-12. **Soft Delete**: 모든 엔티티에 deletedAt 필드 필수, 물리적 삭제 금지
+12. **Audit Trail**: 모든 엔티티에 5가지 필드 필수 (createdAt, createdBy, updatedAt, updatedBy, deletedAt), 물리적 삭제 금지
 
 ---
 

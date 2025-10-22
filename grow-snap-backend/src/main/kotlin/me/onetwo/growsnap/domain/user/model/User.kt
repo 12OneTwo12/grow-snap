@@ -10,7 +10,10 @@ data class User(
     val providerId: String,
     val role: UserRole = UserRole.USER,
     val createdAt: LocalDateTime = LocalDateTime.now(),
-    val updatedAt: LocalDateTime = LocalDateTime.now()
+    val createdBy: UUID? = null,
+    val updatedAt: LocalDateTime = LocalDateTime.now(),
+    val updatedBy: UUID? = null,
+    val deletedAt: LocalDateTime? = null
 )
 
 enum class OAuthProvider {
