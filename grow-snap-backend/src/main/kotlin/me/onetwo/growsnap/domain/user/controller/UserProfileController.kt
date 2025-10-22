@@ -7,14 +7,15 @@ import me.onetwo.growsnap.domain.user.dto.NicknameCheckResponse
 import me.onetwo.growsnap.domain.user.dto.UpdateProfileRequest
 import me.onetwo.growsnap.domain.user.dto.UserProfileResponse
 import me.onetwo.growsnap.domain.user.service.UserProfileService
+import me.onetwo.growsnap.infrastructure.security.jwt.JwtAuthenticationToken
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.multipart.FilePart
+import org.springframework.security.core.context.ReactiveSecurityContextHolder
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -37,40 +38,45 @@ class UserProfileController(
     /**
      * 프로필 생성
      *
-     * @param userId 사용자 ID (인증된 사용자)
      * @param request 프로필 생성 요청
      * @return 생성된 프로필 정보
      */
     @PostMapping
     fun createProfile(
-        @RequestAttribute userId: UUID,
         @Valid @RequestBody request: CreateProfileRequest
     ): Mono<ResponseEntity<UserProfileResponse>> {
-        return Mono.fromCallable {
-            val profile = userProfileService.createProfile(
-                userId = userId,
-                nickname = request.nickname,
-                profileImageUrl = request.profileImageUrl,
-                bio = request.bio
-            )
-            ResponseEntity.status(HttpStatus.CREATED).body(UserProfileResponse.from(profile))
-        }
+        return ReactiveSecurityContextHolder.getContext()
+            .map { (it.authentication as JwtAuthenticationToken).getUserId() }
+            .flatMap { userId ->
+                Mono.fromCallable {
+                    val profile = userProfileService.createProfile(
+                        userId = userId,
+                        nickname = request.nickname,
+                        profileImageUrl = request.profileImageUrl,
+                        bio = request.bio
+                    )
+                    ResponseEntity.status(HttpStatus.CREATED).body(UserProfileResponse.from(profile))
+                }
+            }
     }
 
     /**
      * 내 프로필 조회
      *
-     * @param userId 사용자 ID (인증된 사용자)
+     * SecurityContext에서 인증된 사용자 정보를 가져와 프로필을 조회합니다.
+     *
      * @return 프로필 정보
      */
     @GetMapping("/me")
-    fun getMyProfile(
-        @RequestAttribute userId: UUID
-    ): Mono<ResponseEntity<UserProfileResponse>> {
-        return Mono.fromCallable {
-            val profile = userProfileService.getProfileByUserId(userId)
-            ResponseEntity.ok(UserProfileResponse.from(profile))
-        }
+    fun getMyProfile(): Mono<ResponseEntity<UserProfileResponse>> {
+        return ReactiveSecurityContextHolder.getContext()
+            .map { (it.authentication as JwtAuthenticationToken).getUserId() }
+            .flatMap { userId ->
+                Mono.fromCallable {
+                    val profile = userProfileService.getProfileByUserId(userId)
+                    ResponseEntity.ok(UserProfileResponse.from(profile))
+                }
+            }
     }
 
     /**
@@ -108,24 +114,28 @@ class UserProfileController(
     /**
      * 프로필 수정
      *
-     * @param userId 사용자 ID (인증된 사용자)
+     * SecurityContext에서 인증된 사용자 정보를 가져와 프로필을 수정합니다.
+     *
      * @param request 프로필 수정 요청
      * @return 수정된 프로필 정보
      */
     @PatchMapping
     fun updateProfile(
-        @RequestAttribute userId: UUID,
         @Valid @RequestBody request: UpdateProfileRequest
     ): Mono<ResponseEntity<UserProfileResponse>> {
-        return Mono.fromCallable {
-            val profile = userProfileService.updateProfile(
-                userId = userId,
-                nickname = request.nickname,
-                profileImageUrl = request.profileImageUrl,
-                bio = request.bio
-            )
-            ResponseEntity.ok(UserProfileResponse.from(profile))
-        }
+        return ReactiveSecurityContextHolder.getContext()
+            .map { (it.authentication as JwtAuthenticationToken).getUserId() }
+            .flatMap { userId ->
+                Mono.fromCallable {
+                    val profile = userProfileService.updateProfile(
+                        userId = userId,
+                        nickname = request.nickname,
+                        profileImageUrl = request.profileImageUrl,
+                        bio = request.bio
+                    )
+                    ResponseEntity.ok(UserProfileResponse.from(profile))
+                }
+            }
     }
 
     /**
@@ -147,21 +157,22 @@ class UserProfileController(
     /**
      * 프로필 이미지 업로드
      *
-     * 사용자의 프로필 이미지를 업로드합니다.
+     * SecurityContext에서 인증된 사용자 정보를 가져와 프로필 이미지를 업로드합니다.
      * 이미지는 리사이징된 후 S3에 저장되며, 업로드된 이미지 URL을 반환합니다.
      *
-     * @param userId 사용자 ID (인증된 사용자)
      * @param filePart 업로드할 이미지 파일
      * @return 업로드된 이미지 URL
      */
     @PostMapping("/image")
     fun uploadProfileImage(
-        @RequestAttribute userId: UUID,
         @RequestPart("file") filePart: Mono<FilePart>
     ): Mono<ResponseEntity<ImageUploadResponse>> {
-        return filePart
-            .flatMap { file ->
-                userProfileService.uploadProfileImage(userId, file)
+        return ReactiveSecurityContextHolder.getContext()
+            .map { (it.authentication as JwtAuthenticationToken).getUserId() }
+            .flatMap { userId ->
+                filePart.flatMap { file ->
+                    userProfileService.uploadProfileImage(userId, file)
+                }
             }
             .map { imageUrl ->
                 ResponseEntity.status(HttpStatus.CREATED).body(ImageUploadResponse(imageUrl))

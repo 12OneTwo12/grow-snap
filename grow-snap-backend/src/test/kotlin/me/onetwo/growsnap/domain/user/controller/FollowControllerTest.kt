@@ -59,7 +59,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.post()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isCreated
             .expectBody()
@@ -93,7 +93,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.post()
             .uri("/api/v1/follows/{followingId}", testUserId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().is5xxServerError
     }
@@ -109,7 +109,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.post()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().is5xxServerError
     }
@@ -123,7 +123,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.delete()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isNoContent
             .expectBody()
@@ -150,7 +150,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.delete()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().is5xxServerError
     }
@@ -164,7 +164,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.get()
             .uri("/api/v1/follows/check/{followingId}", testFollowingId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -196,7 +196,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.get()
             .uri("/api/v1/follows/check/{followingId}", testFollowingId)
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -246,7 +246,7 @@ class FollowControllerTest {
         // When & Then
         webTestClient.get()
             .uri("/api/v1/follows/stats/me")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()

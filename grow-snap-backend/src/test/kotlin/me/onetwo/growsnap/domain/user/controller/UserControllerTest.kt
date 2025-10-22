@@ -58,7 +58,7 @@ class UserControllerTest {
         // When & Then
         webTestClient.get()
             .uri("/api/v1/users/me")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()

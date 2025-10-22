@@ -2,10 +2,11 @@ package me.onetwo.growsnap.domain.user.controller
 
 import me.onetwo.growsnap.domain.user.dto.UserResponse
 import me.onetwo.growsnap.domain.user.service.UserService
+import me.onetwo.growsnap.infrastructure.security.jwt.JwtAuthenticationToken
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.context.ReactiveSecurityContextHolder
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
@@ -25,17 +26,20 @@ class UserController(
     /**
      * 내 정보 조회
      *
-     * @param userId 사용자 ID (인증된 사용자)
+     * SecurityContext에서 인증된 사용자 정보를 가져와 사용자 정보를 조회합니다.
+     *
      * @return 사용자 정보
      */
     @GetMapping("/me")
-    fun getMe(
-        @RequestAttribute userId: UUID
-    ): Mono<ResponseEntity<UserResponse>> {
-        return Mono.fromCallable {
-            val user = userService.getUserById(userId)
-            ResponseEntity.ok(UserResponse.from(user))
-        }
+    fun getMe(): Mono<ResponseEntity<UserResponse>> {
+        return ReactiveSecurityContextHolder.getContext()
+            .map { (it.authentication as JwtAuthenticationToken).getUserId() }
+            .flatMap { userId ->
+                Mono.fromCallable {
+                    val user = userService.getUserById(userId)
+                    ResponseEntity.ok(UserResponse.from(user))
+                }
+            }
     }
 
     /**

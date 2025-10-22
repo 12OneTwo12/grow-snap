@@ -78,7 +78,7 @@ class UserProfileControllerTest {
         // When & Then
         webTestClient.post()
             .uri("/api/v1/profiles")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -129,7 +129,7 @@ class UserProfileControllerTest {
         // When & Then
         webTestClient.post()
             .uri("/api/v1/profiles")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -145,7 +145,7 @@ class UserProfileControllerTest {
         // When & Then
         webTestClient.get()
             .uri("/api/v1/profiles/me")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -274,7 +274,7 @@ class UserProfileControllerTest {
         // When & Then
         webTestClient.patch()
             .uri("/api/v1/profiles")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -372,7 +372,7 @@ class UserProfileControllerTest {
 
         webTestClient.post()
             .uri("/api/v1/profiles/image")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
             .exchange()
@@ -413,7 +413,7 @@ class UserProfileControllerTest {
 
         webTestClient.post()
             .uri("/api/v1/profiles/image")
-            .header("X-User-Id", testUserId.toString())
+            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
             .exchange()
