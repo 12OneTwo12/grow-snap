@@ -1,6 +1,7 @@
 package me.onetwo.growsnap.infrastructure.security.oauth2
 
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpStatus
 import org.springframework.security.core.AuthenticationException
 import org.springframework.security.web.server.WebFilterExchange
 import org.springframework.security.web.server.authentication.ServerAuthenticationFailureHandler
@@ -44,7 +45,7 @@ class OAuth2AuthenticationFailureHandler(
             .toUriString()
 
         val exchange = webFilterExchange.exchange
-        exchange.response.statusCode = org.springframework.http.HttpStatus.FOUND
+        exchange.response.statusCode = HttpStatus.FOUND
         exchange.response.headers.location = URI.create(redirectUrl)
 
         return exchange.response.setComplete()

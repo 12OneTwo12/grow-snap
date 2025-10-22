@@ -31,7 +31,7 @@ class UserServiceTest {
     @BeforeEach
     fun setUp() {
         userRepository = mockk()
-        userService = UserService(userRepository)
+        userService = UserServiceImpl(userRepository)
     }
 
     @Test

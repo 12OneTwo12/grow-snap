@@ -3,6 +3,7 @@ package me.onetwo.growsnap.infrastructure.security.oauth2
 import me.onetwo.growsnap.infrastructure.redis.RefreshTokenRepository
 import me.onetwo.growsnap.infrastructure.security.jwt.JwtTokenProvider
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpStatus
 import org.springframework.security.core.Authentication
 import org.springframework.security.web.server.WebFilterExchange
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler
@@ -70,7 +71,7 @@ class OAuth2AuthenticationSuccessHandler(
             .toUriString()
 
         val exchange = webFilterExchange.exchange
-        exchange.response.statusCode = org.springframework.http.HttpStatus.FOUND
+        exchange.response.statusCode = HttpStatus.FOUND
         exchange.response.headers.location = URI.create(redirectUrl)
 
         return exchange.response.setComplete()
