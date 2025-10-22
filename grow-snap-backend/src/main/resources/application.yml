@@ -41,9 +41,32 @@ spring:
             user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
             user-name-attribute: sub
 
+  # AWS S3 Configuration
+  cloud:
+    aws:
+      s3:
+        region: ${AWS_REGION:ap-northeast-2}
+        bucket: ${AWS_S3_BUCKET:grow-snap-profile-images}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_SECRET_ACCESS_KEY}
+      region:
+        static: ${AWS_REGION:ap-northeast-2}
+
 # Application Configuration
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  upload:
+    max-file-size: 5242880  # 5MB (바이트)
+    allowed-image-types:
+      - image/jpeg
+      - image/jpg
+      - image/png
+      - image/webp
+    profile-image:
+      max-width: 500
+      max-height: 500
+      quality: 0.85
 
 # JWT Configuration
 jwt:

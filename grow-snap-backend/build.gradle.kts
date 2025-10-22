@@ -61,6 +61,13 @@ dependencies {
     // BCrypt
     implementation("org.springframework.security:spring-security-crypto")
 
+    // AWS S3 for image upload (Spring Cloud AWS)
+    implementation(platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.0.3"))
+    implementation("io.awspring.cloud:spring-cloud-aws-starter-s3")
+
+    // Image processing (Thumbnailator for resizing)
+    implementation("net.coobird:thumbnailator:0.4.20")
+
     // JDBC for JOOQ
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
 
@@ -100,6 +107,10 @@ tasks.register<Copy>("copyDocument") {
     dependsOn(tasks.asciidoctor)
     from(file("build/docs/asciidoc"))
     into(file("src/main/resources/static/docs"))
+}
+
+tasks.named("processResources") {
+    dependsOn("copyDocument")
 }
 
 tasks.register<Copy>("buildDocument") {
