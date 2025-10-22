@@ -1,6 +1,6 @@
 package me.onetwo.growsnap.domain.user.repository
 
-import com.onetwo.growsnap.jooq.generated.tables.references.FOLLOWS
+import me.onetwo.growsnap.jooq.generated.tables.references.FOLLOWS
 import me.onetwo.growsnap.domain.user.model.Follow
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository

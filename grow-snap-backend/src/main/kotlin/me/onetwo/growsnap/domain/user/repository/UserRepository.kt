@@ -1,6 +1,6 @@
 package me.onetwo.growsnap.domain.user.repository
 
-import com.onetwo.growsnap.jooq.generated.tables.references.USERS
+import me.onetwo.growsnap.jooq.generated.tables.references.USERS
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserRole
@@ -97,7 +97,7 @@ class UserRepository(
     /**
      * JOOQ Record를 User 도메인 모델로 변환
      */
-    private fun mapToUser(record: com.onetwo.growsnap.jooq.generated.tables.records.UsersRecord): User {
+    private fun mapToUser(record: me.onetwo.growsnap.jooq.generated.tables.records.UsersRecord): User {
         return User(
             id = record.id,
             email = record.email!!,

@@ -234,7 +234,7 @@ jooq {
                     }
 
                     target.apply {
-                        packageName = "com.onetwo.growsnap.jooq.generated" // JOOQ 코드 저장 경로
+                        packageName = "me.onetwo.growsnap.jooq.generated" // JOOQ 코드 저장 경로
                         directory = "src/main/generated"
                     }
                 }

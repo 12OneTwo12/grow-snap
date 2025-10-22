@@ -1,6 +1,6 @@
 package me.onetwo.growsnap.domain.user.repository
 
-import com.onetwo.growsnap.jooq.generated.tables.references.USER_PROFILES
+import me.onetwo.growsnap.jooq.generated.tables.references.USER_PROFILES
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
@@ -58,7 +58,7 @@ class UserProfileRepository(
         )
     }
 
-    private fun mapToUserProfile(record: com.onetwo.growsnap.jooq.generated.tables.records.UserProfilesRecord): UserProfile {
+    private fun mapToUserProfile(record: me.onetwo.growsnap.jooq.generated.tables.records.UserProfilesRecord): UserProfile {
         return UserProfile(
             id = record.id,
             userId = record.userId!!,
