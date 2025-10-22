@@ -48,6 +48,11 @@ class UserProfileServiceImpl(
         // 사용자 존재 여부 확인
         userService.getUserById(userId)
 
+        // 사용자당 프로필은 1개만 가능
+        if (userProfileRepository.existsByUserId(userId)) {
+            throw IllegalStateException("이미 프로필이 존재합니다. User ID: $userId")
+        }
+
         // 닉네임 중복 확인
         if (userProfileRepository.existsByNickname(nickname)) {
             throw DuplicateNicknameException(nickname)

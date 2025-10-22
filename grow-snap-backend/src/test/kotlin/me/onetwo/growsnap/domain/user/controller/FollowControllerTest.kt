@@ -95,7 +95,7 @@ class FollowControllerTest {
             .uri("/api/v1/follows/{followingId}", testUserId)
             .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     @Test
@@ -111,7 +111,7 @@ class FollowControllerTest {
             .uri("/api/v1/follows/{followingId}", testFollowingId)
             .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     @Test
@@ -152,7 +152,7 @@ class FollowControllerTest {
             .uri("/api/v1/follows/{followingId}", testFollowingId)
             .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     @Test

@@ -89,8 +89,8 @@ class FollowServiceImpl(
             throw NotFollowingException(followingId)
         }
 
-        // 팔로우 관계 삭제
-        followRepository.delete(followerId, followingId)
+        // 팔로우 관계 삭제 (Soft Delete)
+        followRepository.softDelete(followerId, followingId)
 
         // 팔로워/팔로잉 수 업데이트
         userProfileService.decrementFollowingCount(followerId)

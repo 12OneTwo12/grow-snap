@@ -70,6 +70,7 @@ class UserProfileServiceTest {
         val nickname = "newnick"
 
         every { userService.getUserById(userId) } returns testUser
+        every { userProfileRepository.existsByUserId(userId) } returns false  // 프로필 중복 체크
         every { userProfileRepository.existsByNickname(nickname) } returns false
         every { userProfileRepository.save(any()) } returns testProfile.copy(nickname = nickname)
 
@@ -79,6 +80,7 @@ class UserProfileServiceTest {
         // Then
         assertEquals(nickname, result.nickname)
         verify(exactly = 1) { userService.getUserById(userId) }
+        verify(exactly = 1) { userProfileRepository.existsByUserId(userId) }
         verify(exactly = 1) { userProfileRepository.existsByNickname(nickname) }
         verify(exactly = 1) { userProfileRepository.save(any()) }
     }
@@ -91,6 +93,7 @@ class UserProfileServiceTest {
         val nickname = "duplicatenick"
 
         every { userService.getUserById(userId) } returns testUser
+        every { userProfileRepository.existsByUserId(userId) } returns false  // 프로필 중복 체크
         every { userProfileRepository.existsByNickname(nickname) } returns true
 
         // When & Then
@@ -100,6 +103,7 @@ class UserProfileServiceTest {
 
         assertEquals(nickname, exception.nickname)
         verify(exactly = 1) { userService.getUserById(userId) }
+        verify(exactly = 1) { userProfileRepository.existsByUserId(userId) }
         verify(exactly = 1) { userProfileRepository.existsByNickname(nickname) }
         verify(exactly = 0) { userProfileRepository.save(any()) }
     }

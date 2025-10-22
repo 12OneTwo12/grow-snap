@@ -92,7 +92,7 @@ class FollowRepositoryTest {
         followRepository.save(follow)
 
         // When
-        followRepository.delete(follower.id!!, following.id!!)
+        followRepository.softDelete(follower.id!!, following.id!!)
 
         // Then
         val exists = followRepository.existsByFollowerIdAndFollowingId(follower.id!!, following.id!!)
@@ -202,7 +202,7 @@ class FollowRepositoryTest {
         followRepository.save(Follow(followerId = follower.id!!, followingId = anotherUser.id!!))
 
         // When
-        followRepository.delete(follower.id!!, following.id!!)
+        followRepository.softDelete(follower.id!!, following.id!!)
         val countAfterDelete = followRepository.countByFollowerId(follower.id!!)
 
         // Then
@@ -214,7 +214,7 @@ class FollowRepositoryTest {
     fun delete_NonExistingFollow_NoError() {
         // When & Then (예외가 발생하지 않아야 함)
         assertDoesNotThrow {
-            followRepository.delete(follower.id!!, following.id!!)
+            followRepository.softDelete(follower.id!!, following.id!!)
         }
     }
 

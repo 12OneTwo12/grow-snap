@@ -9,7 +9,10 @@ import io.mockk.verify
 import me.onetwo.growsnap.domain.user.exception.UserNotFoundException
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
+import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.model.UserRole
+import me.onetwo.growsnap.domain.user.repository.FollowRepository
+import me.onetwo.growsnap.domain.user.repository.UserProfileRepository
 import me.onetwo.growsnap.domain.user.repository.UserRepository
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -26,12 +29,16 @@ import org.junit.jupiter.api.extension.ExtendWith
 class UserServiceTest {
 
     private lateinit var userRepository: UserRepository
+    private lateinit var userProfileRepository: UserProfileRepository
+    private lateinit var followRepository: FollowRepository
     private lateinit var userService: UserService
 
     @BeforeEach
     fun setUp() {
         userRepository = mockk()
-        userService = UserServiceImpl(userRepository)
+        userProfileRepository = mockk()
+        followRepository = mockk()
+        userService = UserServiceImpl(userRepository, userProfileRepository, followRepository)
     }
 
     @Test
@@ -41,6 +48,8 @@ class UserServiceTest {
         val email = "test@example.com"
         val provider = OAuthProvider.GOOGLE
         val providerId = "google-123"
+        val name = "Test User"
+        val profileImageUrl = "https://example.com/profile.jpg"
 
         val existingUser = User(
             id = UUID.randomUUID(),
@@ -55,7 +64,7 @@ class UserServiceTest {
         } returns existingUser
 
         // When
-        val result = userService.findOrCreateOAuthUser(email, provider, providerId)
+        val result = userService.findOrCreateOAuthUser(email, provider, providerId, name, profileImageUrl)
 
         // Then
         assertEquals(existingUser, result)
@@ -63,22 +72,34 @@ class UserServiceTest {
             userRepository.findByProviderAndProviderId(provider, providerId)
         }
         verify(exactly = 0) { userRepository.save(any()) }
+        verify(exactly = 0) { userProfileRepository.save(any()) }  // 기존 사용자는 프로필 생성 안함
     }
 
     @Test
-    @DisplayName("OAuth 사용자 조회 또는 생성 - 신규 사용자 생성")
-    fun findOrCreateOAuthUser_NewUser_CreatesUser() {
+    @DisplayName("OAuth 사용자 조회 또는 생성 - 신규 사용자 및 프로필 생성")
+    fun findOrCreateOAuthUser_NewUser_CreatesUserAndProfile() {
         // Given
         val email = "new@example.com"
         val provider = OAuthProvider.GOOGLE
         val providerId = "google-456"
+        val name = "New User"
+        val profileImageUrl = "https://example.com/new-profile.jpg"
 
+        val userId = UUID.randomUUID()
         val newUser = User(
-            id = UUID.randomUUID(),
+            id = userId,
             email = email,
             provider = provider,
             providerId = providerId,
             role = UserRole.USER
+        )
+
+        val mockProfile = UserProfile(
+            id = 1L,
+            userId = userId,
+            nickname = name,
+            profileImageUrl = profileImageUrl,
+            bio = null
         )
 
         every {
@@ -86,9 +107,11 @@ class UserServiceTest {
         } returns null
 
         every { userRepository.save(any()) } returns newUser
+        every { userProfileRepository.existsByNickname(any()) } returns false  // 닉네임 중복 없음
+        every { userProfileRepository.save(any()) } returns mockProfile
 
         // When
-        val result = userService.findOrCreateOAuthUser(email, provider, providerId)
+        val result = userService.findOrCreateOAuthUser(email, provider, providerId, name, profileImageUrl)
 
         // Then
         assertEquals(newUser, result)
@@ -96,6 +119,7 @@ class UserServiceTest {
             userRepository.findByProviderAndProviderId(provider, providerId)
         }
         verify(exactly = 1) { userRepository.save(any()) }
+        verify(exactly = 1) { userProfileRepository.save(any()) }  // 신규 사용자는 프로필 자동 생성
     }
 
     @Test

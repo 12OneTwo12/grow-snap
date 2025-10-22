@@ -131,6 +131,30 @@ class UserControllerTest {
         webTestClient.get()
             .uri("/api/v1/users/{targetUserId}", nonExistentId)
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
+    }
+
+    @Test
+    @DisplayName("회원 탈퇴 성공")
+    fun withdrawMe_Success() {
+        // Given
+        every { userService.withdrawUser(testUserId) } returns Unit
+
+        // When & Then
+        webTestClient.delete()
+            .uri("/api/v1/users/me")
+            .header("Authorization", "Bearer test-token-${testUserId}")
+            .exchange()
+            .expectStatus().isNoContent
+            .expectBody()
+            .consumeWith(
+                document(
+                    "user-withdraw-me",
+                    preprocessRequest(prettyPrint()),
+                    preprocessResponse(prettyPrint())
+                )
+            )
+
+        verify(exactly = 1) { userService.withdrawUser(testUserId) }
     }
 }

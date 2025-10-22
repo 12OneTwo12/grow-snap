@@ -49,12 +49,14 @@ class CustomReactiveOAuth2UserService(
                 val attributes = oauth2User.attributes
                 val userInfo = extractUserInfo(provider, attributes)
 
-                // 사용자 조회 또는 생성
+                // 사용자 조회 또는 생성 (프로필 자동 생성 포함)
                 Mono.fromCallable {
                     userService.findOrCreateOAuthUser(
                         email = userInfo.email,
                         provider = provider,
-                        providerId = userInfo.providerId
+                        providerId = userInfo.providerId,
+                        name = userInfo.name,
+                        profileImageUrl = userInfo.profileImageUrl
                     )
                 }.map { user ->
                     // OAuth2User에 사용자 ID, 이메일, 역할 정보 추가

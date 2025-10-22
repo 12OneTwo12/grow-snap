@@ -6,7 +6,6 @@ import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.verify
 import me.onetwo.growsnap.config.TestSecurityConfig
-import me.onetwo.growsnap.domain.user.dto.CreateProfileRequest
 import me.onetwo.growsnap.domain.user.dto.UpdateProfileRequest
 import me.onetwo.growsnap.domain.user.exception.DuplicateNicknameException
 import me.onetwo.growsnap.domain.user.exception.UserProfileNotFoundException
@@ -56,85 +55,6 @@ class UserProfileControllerTest {
         followerCount = 10,
         followingCount = 5
     )
-
-    @Test
-    @DisplayName("프로필 생성 성공")
-    fun createProfile_Success() {
-        // Given
-        val request = CreateProfileRequest(
-            nickname = "newnick",
-            profileImageUrl = "https://example.com/new.jpg",
-            bio = "새로운 자기소개"
-        )
-
-        every {
-            userProfileService.createProfile(testUserId, request.nickname, request.profileImageUrl, request.bio)
-        } returns testProfile.copy(
-            nickname = request.nickname,
-            profileImageUrl = request.profileImageUrl,
-            bio = request.bio
-        )
-
-        // When & Then
-        webTestClient.post()
-            .uri("/api/v1/profiles")
-            .header("Authorization", "Bearer test-token-${testUserId}")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().isCreated
-            .expectBody()
-            .jsonPath("$.nickname").isEqualTo("newnick")
-            .jsonPath("$.profileImageUrl").isEqualTo("https://example.com/new.jpg")
-            .jsonPath("$.bio").isEqualTo("새로운 자기소개")
-            .consumeWith(
-                document(
-                    "profile-create",
-                    preprocessRequest(prettyPrint()),
-                    preprocessResponse(prettyPrint()),
-                    requestFields(
-                        fieldWithPath("nickname").description("닉네임 (2-20자)"),
-                        fieldWithPath("profileImageUrl").description("프로필 이미지 URL (선택)").optional(),
-                        fieldWithPath("bio").description("자기소개 (선택, 500자 이하)").optional()
-                    ),
-                    responseFields(
-                        fieldWithPath("id").description("프로필 ID"),
-                        fieldWithPath("userId").description("사용자 ID"),
-                        fieldWithPath("nickname").description("닉네임"),
-                        fieldWithPath("profileImageUrl").description("프로필 이미지 URL"),
-                        fieldWithPath("bio").description("자기소개"),
-                        fieldWithPath("followerCount").description("팔로워 수"),
-                        fieldWithPath("followingCount").description("팔로잉 수"),
-                        fieldWithPath("createdAt").description("생성일시"),
-                        fieldWithPath("updatedAt").description("수정일시")
-                    )
-                )
-            )
-
-        verify(exactly = 1) {
-            userProfileService.createProfile(testUserId, request.nickname, request.profileImageUrl, request.bio)
-        }
-    }
-
-    @Test
-    @DisplayName("프로필 생성 실패 - 중복 닉네임")
-    fun createProfile_DuplicateNickname_ThrowsException() {
-        // Given
-        val request = CreateProfileRequest(nickname = "duplicatenick")
-
-        every {
-            userProfileService.createProfile(testUserId, request.nickname, null, null)
-        } throws DuplicateNicknameException(request.nickname)
-
-        // When & Then
-        webTestClient.post()
-            .uri("/api/v1/profiles")
-            .header("Authorization", "Bearer test-token-${testUserId}")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus().is5xxServerError
-    }
 
     @Test
     @DisplayName("내 프로필 조회 성공")
@@ -255,7 +175,7 @@ class UserProfileControllerTest {
         webTestClient.get()
             .uri("/api/v1/profiles/{targetUserId}", nonExistentId)
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     @Test
@@ -417,7 +337,7 @@ class UserProfileControllerTest {
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     /**

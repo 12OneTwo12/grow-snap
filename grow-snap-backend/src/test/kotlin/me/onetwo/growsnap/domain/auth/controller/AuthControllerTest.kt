@@ -92,7 +92,7 @@ class AuthControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     @Test
@@ -142,7 +142,7 @@ class AuthControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
-            .expectStatus().is5xxServerError
+            .expectStatus().is4xxClientError
     }
 
     @Test

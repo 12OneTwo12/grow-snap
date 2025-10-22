@@ -1,7 +1,6 @@
 package me.onetwo.growsnap.domain.user.controller
 
 import jakarta.validation.Valid
-import me.onetwo.growsnap.domain.user.dto.CreateProfileRequest
 import me.onetwo.growsnap.domain.user.dto.ImageUploadResponse
 import me.onetwo.growsnap.domain.user.dto.NicknameCheckResponse
 import me.onetwo.growsnap.domain.user.dto.UpdateProfileRequest
@@ -25,36 +24,15 @@ import java.util.UUID
 /**
  * 사용자 프로필 관리 Controller
  *
- * 프로필 생성, 조회, 수정, 닉네임 중복 확인 등의 API를 제공합니다.
+ * 프로필 조회, 수정, 닉네임 중복 확인, 이미지 업로드 API를 제공합니다.
+ *
+ * **참고**: 프로필은 OAuth 회원가입 시 자동 생성됩니다.
  */
 @RestController
 @RequestMapping("/api/v1/profiles")
 class UserProfileController(
     private val userProfileService: UserProfileService
 ) {
-
-    /**
-     * 프로필 생성
-     *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
-     * @param request 프로필 생성 요청
-     * @return 생성된 프로필 정보
-     */
-    @PostMapping
-    fun createProfile(
-        @AuthenticationPrincipal userId: UUID,
-        @Valid @RequestBody request: CreateProfileRequest
-    ): Mono<ResponseEntity<UserProfileResponse>> {
-        return Mono.fromCallable {
-            val profile = userProfileService.createProfile(
-                userId = userId,
-                nickname = request.nickname,
-                profileImageUrl = request.profileImageUrl,
-                bio = request.bio
-            )
-            ResponseEntity.status(HttpStatus.CREATED).body(UserProfileResponse.from(profile))
-        }
-    }
 
     /**
      * 내 프로필 조회

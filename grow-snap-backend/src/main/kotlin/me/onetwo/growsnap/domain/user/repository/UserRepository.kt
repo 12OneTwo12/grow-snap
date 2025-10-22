@@ -4,8 +4,10 @@ import me.onetwo.growsnap.jooq.generated.tables.references.USERS
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserRole
+import me.onetwo.growsnap.jooq.generated.tables.records.UsersRecord
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -47,6 +49,7 @@ class UserRepository(
     fun findByEmail(email: String): User? {
         return dsl.selectFrom(USERS)
             .where(USERS.EMAIL.eq(email))
+            .and(USERS.DELETED_AT.isNull)  // Soft delete 필터링
             .fetchOne()
             ?.let { mapToUser(it) }
     }
@@ -62,6 +65,7 @@ class UserRepository(
         return dsl.selectFrom(USERS)
             .where(USERS.PROVIDER.eq(provider.name))
             .and(USERS.PROVIDER_ID.eq(providerId))
+            .and(USERS.DELETED_AT.isNull)  // Soft delete 필터링
             .fetchOne()
             ?.let { mapToUser(it) }
     }
@@ -75,14 +79,31 @@ class UserRepository(
     fun findById(id: UUID): User? {
         return dsl.selectFrom(USERS)
             .where(USERS.ID.eq(id.toString()))
+            .and(USERS.DELETED_AT.isNull)  // Soft delete 필터링
             .fetchOne()
             ?.let { mapToUser(it) }
     }
 
     /**
+     * 사용자 삭제 (Soft Delete)
+     *
+     * @param id 사용자 ID
+     * @param deletedBy 삭제를 수행한 사용자 ID
+     */
+    fun softDelete(id: UUID, deletedBy: UUID) {
+        dsl.update(USERS)
+            .set(USERS.DELETED_AT, LocalDateTime.now())
+            .set(USERS.UPDATED_AT, LocalDateTime.now())
+            .set(USERS.UPDATED_BY, deletedBy.toString())
+            .where(USERS.ID.eq(id.toString()))
+            .and(USERS.DELETED_AT.isNull)  // 이미 삭제된 데이터는 제외
+            .execute()
+    }
+
+    /**
      * JOOQ Record를 User 도메인 모델로 변환
      */
-    private fun mapToUser(record: me.onetwo.growsnap.jooq.generated.tables.records.UsersRecord): User {
+    private fun mapToUser(record: UsersRecord): User {
         return User(
             id = UUID.fromString(record.id!!),
             email = record.email!!,

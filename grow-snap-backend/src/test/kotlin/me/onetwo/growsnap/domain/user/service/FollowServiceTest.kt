@@ -169,7 +169,7 @@ class FollowServiceTest {
         every {
             followRepository.existsByFollowerIdAndFollowingId(followerId, followingId)
         } returns true
-        every { followRepository.delete(followerId, followingId) } returns Unit
+        every { followRepository.softDelete(followerId, followingId) } returns Unit
         every { userProfileService.decrementFollowingCount(followerId) } returns
                 followerProfile.copy(followingCount = 0)
         every { userProfileService.decrementFollowerCount(followingId) } returns
@@ -184,7 +184,7 @@ class FollowServiceTest {
         verify(exactly = 1) {
             followRepository.existsByFollowerIdAndFollowingId(followerId, followingId)
         }
-        verify(exactly = 1) { followRepository.delete(followerId, followingId) }
+        verify(exactly = 1) { followRepository.softDelete(followerId, followingId) }
         verify(exactly = 1) { userProfileService.decrementFollowingCount(followerId) }
         verify(exactly = 1) { userProfileService.decrementFollowerCount(followingId) }
     }
@@ -213,7 +213,7 @@ class FollowServiceTest {
         verify(exactly = 1) {
             followRepository.existsByFollowerIdAndFollowingId(followerId, followingId)
         }
-        verify(exactly = 0) { followRepository.delete(any(), any()) }
+        verify(exactly = 0) { followRepository.softDelete(any(), any()) }
     }
 
     @Test

@@ -15,16 +15,21 @@ interface UserService {
      * OAuth 제공자와 Provider ID로 사용자 조회 또는 생성
      *
      * OAuth 로그인 시 사용하며, 기존 사용자가 있으면 반환하고 없으면 새로 생성합니다.
+     * 신규 사용자 생성 시 프로필도 자동으로 생성됩니다.
      *
      * @param email 사용자 이메일
      * @param provider OAuth 제공자 (GOOGLE, NAVER, KAKAO 등)
      * @param providerId OAuth 제공자에서 제공한 사용자 고유 ID
+     * @param name OAuth 제공자에서 제공한 사용자 이름 (닉네임으로 사용)
+     * @param profileImageUrl OAuth 제공자에서 제공한 프로필 이미지 URL
      * @return 조회되거나 생성된 사용자
      */
     fun findOrCreateOAuthUser(
         email: String,
         provider: OAuthProvider,
-        providerId: String
+        providerId: String,
+        name: String?,
+        profileImageUrl: String?
     ): User
 
     /**
@@ -52,4 +57,19 @@ interface UserService {
      * @return 중복 여부 (true: 중복, false: 사용 가능)
      */
     fun isEmailDuplicated(email: String): Boolean
+
+    /**
+     * 사용자 회원 탈퇴 (Soft Delete)
+     *
+     * 사용자, 프로필, 팔로우 관계를 모두 soft delete 처리합니다.
+     *
+     * ### 처리 내용
+     * 1. 사용자 정보 soft delete
+     * 2. 프로필 정보 soft delete
+     * 3. 팔로우/팔로잉 관계 soft delete (양방향 모두)
+     *
+     * @param userId 탈퇴할 사용자 ID
+     * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
+     */
+    fun withdrawUser(userId: UUID)
 }
