@@ -43,6 +43,10 @@ dependencies {
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // MockK for Kotlin testing
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("com.ninja-squad:springmockk:4.0.2")
+
     // OAuth2 Client
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 
