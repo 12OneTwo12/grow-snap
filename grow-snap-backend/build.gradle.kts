@@ -10,9 +10,6 @@ plugins {
     id ("io.gitlab.arturbosch.detekt") version "1.23.6"
 
     id("nu.studer.jooq") version "8.2"
-
-    // IDE에서 JOOQ generated 소스 인식을 위한 플러그인
-    idea
 }
 
 group = "me.onetwo"
@@ -42,7 +39,7 @@ dependencies {
     runtimeOnly("com.mysql:mysql-connector-j")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-    testImplementation("org.springframework.restdocs:spring-restdocs-mockmvc")
+    testImplementation("org.springframework.restdocs:spring-restdocs-webtestclient")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 

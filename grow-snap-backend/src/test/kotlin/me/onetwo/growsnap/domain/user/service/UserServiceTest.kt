@@ -217,63 +217,6 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("크리에이터 전환 성공")
-    fun convertToCreator_ExistingUser_ConvertsToCreator() {
-        // Given
-        val userId = 1L
-        val user = User(
-            id = userId,
-            email = "test@example.com",
-            provider = OAuthProvider.GOOGLE,
-            providerId = "google-123",
-            role = UserRole.USER,
-            isCreator = false
-        )
-
-        val creatorUser = user.copy(
-            role = UserRole.CREATOR,
-            isCreator = true
-        )
-
-        every { userRepository.findById(userId) } returns user
-        every { userRepository.update(any()) } returns creatorUser
-
-        // When
-        val result = userService.convertToCreator(userId)
-
-        // Then
-        assertEquals(UserRole.CREATOR, result.role)
-        assertTrue(result.isCreator)
-        verify(exactly = 1) { userRepository.findById(userId) }
-        verify(exactly = 1) { userRepository.update(any()) }
-    }
-
-    @Test
-    @DisplayName("크리에이터 전환 - 이미 크리에이터인 경우")
-    fun convertToCreator_AlreadyCreator_ReturnsUser() {
-        // Given
-        val userId = 1L
-        val creatorUser = User(
-            id = userId,
-            email = "test@example.com",
-            provider = OAuthProvider.GOOGLE,
-            providerId = "google-123",
-            role = UserRole.CREATOR,
-            isCreator = true
-        )
-
-        every { userRepository.findById(userId) } returns creatorUser
-
-        // When
-        val result = userService.convertToCreator(userId)
-
-        // Then
-        assertEquals(creatorUser, result)
-        verify(exactly = 1) { userRepository.findById(userId) }
-        verify(exactly = 0) { userRepository.update(any()) }
-    }
-
-    @Test
     @DisplayName("사용자 정보 업데이트 성공")
     fun updateUser_ExistingUser_UpdatesUser() {
         // Given

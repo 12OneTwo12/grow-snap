@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import java.time.LocalDateTime
+import java.util.UUID
 
 /**
  * 프로필 생성 요청 DTO
@@ -39,7 +40,7 @@ data class UpdateProfileRequest(
  */
 data class UserProfileResponse(
     val id: Long,
-    val userId: Long,
+    val userId: UUID,
     val nickname: String,
     val profileImageUrl: String?,
     val bio: String?,

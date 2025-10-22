@@ -7,6 +7,7 @@ import me.onetwo.growsnap.domain.user.service.FollowService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
+import java.util.UUID
 
 /**
  * 팔로우 관리 Controller
@@ -29,8 +30,8 @@ class FollowController(
     @PostMapping("/{followingId}")
     @ResponseStatus(HttpStatus.CREATED)
     fun follow(
-        @RequestAttribute userId: Long,
-        @PathVariable followingId: Long
+        @RequestAttribute userId: UUID,
+        @PathVariable followingId: UUID
     ): Mono<FollowResponse> {
         return Mono.fromCallable {
             val follow = followService.follow(userId, followingId)
@@ -47,8 +48,8 @@ class FollowController(
     @DeleteMapping("/{followingId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unfollow(
-        @RequestAttribute userId: Long,
-        @PathVariable followingId: Long
+        @RequestAttribute userId: UUID,
+        @PathVariable followingId: UUID
     ): Mono<Void> {
         return Mono.fromRunnable {
             followService.unfollow(userId, followingId)
@@ -64,8 +65,8 @@ class FollowController(
      */
     @GetMapping("/check/{followingId}")
     fun checkFollowing(
-        @RequestAttribute userId: Long,
-        @PathVariable followingId: Long
+        @RequestAttribute userId: UUID,
+        @PathVariable followingId: UUID
     ): Mono<FollowCheckResponse> {
         return Mono.fromCallable {
             val isFollowing = followService.isFollowing(userId, followingId)
@@ -81,7 +82,7 @@ class FollowController(
      */
     @GetMapping("/stats/{targetUserId}")
     fun getFollowStats(
-        @PathVariable targetUserId: Long
+        @PathVariable targetUserId: UUID
     ): Mono<FollowStatsResponse> {
         return Mono.fromCallable {
             val followerCount = followService.getFollowerCount(targetUserId)
@@ -98,7 +99,7 @@ class FollowController(
      */
     @GetMapping("/stats/me")
     fun getMyFollowStats(
-        @RequestAttribute userId: Long
+        @RequestAttribute userId: UUID
     ): Mono<FollowStatsResponse> {
         return Mono.fromCallable {
             val followerCount = followService.getFollowerCount(userId)

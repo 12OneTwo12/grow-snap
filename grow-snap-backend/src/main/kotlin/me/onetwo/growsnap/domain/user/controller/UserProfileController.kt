@@ -6,6 +6,7 @@ import me.onetwo.growsnap.domain.user.service.UserProfileService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
+import java.util.UUID
 
 /**
  * 사용자 프로필 관리 Controller
@@ -28,7 +29,7 @@ class UserProfileController(
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun createProfile(
-        @RequestAttribute userId: Long,
+        @RequestAttribute userId: UUID,
         @Valid @RequestBody request: CreateProfileRequest
     ): Mono<UserProfileResponse> {
         return Mono.fromCallable {
@@ -50,7 +51,7 @@ class UserProfileController(
      */
     @GetMapping("/me")
     fun getMyProfile(
-        @RequestAttribute userId: Long
+        @RequestAttribute userId: UUID
     ): Mono<UserProfileResponse> {
         return Mono.fromCallable {
             val profile = userProfileService.getProfileByUserId(userId)
@@ -66,7 +67,7 @@ class UserProfileController(
      */
     @GetMapping("/{targetUserId}")
     fun getProfileByUserId(
-        @PathVariable targetUserId: Long
+        @PathVariable targetUserId: UUID
     ): Mono<UserProfileResponse> {
         return Mono.fromCallable {
             val profile = userProfileService.getProfileByUserId(targetUserId)
@@ -99,7 +100,7 @@ class UserProfileController(
      */
     @PatchMapping
     fun updateProfile(
-        @RequestAttribute userId: Long,
+        @RequestAttribute userId: UUID,
         @Valid @RequestBody request: UpdateProfileRequest
     ): Mono<UserProfileResponse> {
         return Mono.fromCallable {

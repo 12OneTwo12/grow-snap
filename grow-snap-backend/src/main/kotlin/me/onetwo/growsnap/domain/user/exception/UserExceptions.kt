@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.exception
 
+import java.util.UUID
+
 /**
  * 사용자를 찾을 수 없을 때 발생하는 예외
  *
@@ -42,7 +44,7 @@ class DuplicateEmailException(
  * @property followingId 팔로우 대상 사용자 ID
  */
 class AlreadyFollowingException(
-    val followingId: Long
+    val followingId: UUID
 ) : RuntimeException("이미 팔로우 중인 사용자입니다: $followingId")
 
 /**
@@ -57,5 +59,5 @@ class CannotFollowSelfException :
  * @property followingId 언팔로우 대상 사용자 ID
  */
 class NotFollowingException(
-    val followingId: Long
+    val followingId: UUID
 ) : RuntimeException("팔로우하지 않은 사용자입니다: $followingId")

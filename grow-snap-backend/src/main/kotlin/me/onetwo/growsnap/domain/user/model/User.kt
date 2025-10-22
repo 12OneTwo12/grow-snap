@@ -1,14 +1,14 @@
 package me.onetwo.growsnap.domain.user.model
 
 import java.time.LocalDateTime
+import java.util.UUID
 
 data class User(
-    val id: Long? = null,
+    val id: UUID? = null,
     val email: String,
     val provider: OAuthProvider,
     val providerId: String,
-    val role: UserRole,
-    val isCreator: Boolean = false,
+    val role: UserRole = UserRole.USER,
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now()
 )
@@ -21,6 +21,5 @@ enum class OAuthProvider {
 
 enum class UserRole {
     USER,
-    CREATOR,
     ADMIN
 }

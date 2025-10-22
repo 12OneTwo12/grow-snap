@@ -6,6 +6,7 @@ import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.repository.UserProfileRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 /**
  * 사용자 프로필 관리 서비스
@@ -34,7 +35,7 @@ class UserProfileService(
      */
     @Transactional
     fun createProfile(
-        userId: Long,
+        userId: UUID,
         nickname: String,
         profileImageUrl: String? = null,
         bio: String? = null
@@ -64,7 +65,7 @@ class UserProfileService(
      * @return 프로필 정보
      * @throws UserProfileNotFoundException 프로필을 찾을 수 없는 경우
      */
-    fun getProfileByUserId(userId: Long): UserProfile {
+    fun getProfileByUserId(userId: UUID): UserProfile {
         return userProfileRepository.findByUserId(userId)
             ?: throw UserProfileNotFoundException("프로필을 찾을 수 없습니다. User ID: $userId")
     }
@@ -106,7 +107,7 @@ class UserProfileService(
      */
     @Transactional
     fun updateProfile(
-        userId: Long,
+        userId: UUID,
         nickname: String? = null,
         profileImageUrl: String? = null,
         bio: String? = null
@@ -137,7 +138,7 @@ class UserProfileService(
      * @throws UserProfileNotFoundException 프로필을 찾을 수 없는 경우
      */
     @Transactional
-    fun incrementFollowerCount(userId: Long): UserProfile {
+    fun incrementFollowerCount(userId: UUID): UserProfile {
         val profile = getProfileByUserId(userId)
         val updatedProfile = profile.copy(followerCount = profile.followerCount + 1)
         return userProfileRepository.update(updatedProfile)
@@ -151,7 +152,7 @@ class UserProfileService(
      * @throws UserProfileNotFoundException 프로필을 찾을 수 없는 경우
      */
     @Transactional
-    fun decrementFollowerCount(userId: Long): UserProfile {
+    fun decrementFollowerCount(userId: UUID): UserProfile {
         val profile = getProfileByUserId(userId)
         val updatedProfile = profile.copy(
             followerCount = maxOf(0, profile.followerCount - 1)
@@ -167,7 +168,7 @@ class UserProfileService(
      * @throws UserProfileNotFoundException 프로필을 찾을 수 없는 경우
      */
     @Transactional
-    fun incrementFollowingCount(userId: Long): UserProfile {
+    fun incrementFollowingCount(userId: UUID): UserProfile {
         val profile = getProfileByUserId(userId)
         val updatedProfile = profile.copy(followingCount = profile.followingCount + 1)
         return userProfileRepository.update(updatedProfile)
@@ -181,7 +182,7 @@ class UserProfileService(
      * @throws UserProfileNotFoundException 프로필을 찾을 수 없는 경우
      */
     @Transactional
-    fun decrementFollowingCount(userId: Long): UserProfile {
+    fun decrementFollowingCount(userId: UUID): UserProfile {
         val profile = getProfileByUserId(userId)
         val updatedProfile = profile.copy(
             followingCount = maxOf(0, profile.followingCount - 1)

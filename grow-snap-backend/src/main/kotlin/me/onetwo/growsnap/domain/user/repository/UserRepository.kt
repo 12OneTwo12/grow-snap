@@ -6,6 +6,7 @@ import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserRole
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
+import java.util.UUID
 
 /**
  * 사용자 Repository
@@ -25,16 +26,16 @@ class UserRepository(
      * @return 저장된 사용자 (ID 포함)
      */
     fun save(user: User): User {
-        val record = dsl.insertInto(USERS)
+        val userId = user.id ?: UUID.randomUUID()
+        dsl.insertInto(USERS)
+            .set(USERS.ID, userId.toString())
             .set(USERS.EMAIL, user.email)
             .set(USERS.PROVIDER, user.provider.name)
             .set(USERS.PROVIDER_ID, user.providerId)
             .set(USERS.ROLE, user.role.name)
-            .set(USERS.IS_CREATOR, user.isCreator)
-            .returning()
-            .fetchOne()!!
+            .execute()
 
-        return user.copy(id = record.id)
+        return user.copy(id = userId)
     }
 
     /**
@@ -71,27 +72,11 @@ class UserRepository(
      * @param id 사용자 ID
      * @return 사용자 정보 (존재하지 않으면 null)
      */
-    fun findById(id: Long): User? {
+    fun findById(id: UUID): User? {
         return dsl.selectFrom(USERS)
-            .where(USERS.ID.eq(id))
+            .where(USERS.ID.eq(id.toString()))
             .fetchOne()
             ?.let { mapToUser(it) }
-    }
-
-    /**
-     * 사용자 업데이트
-     *
-     * @param user 사용자 정보
-     * @return 업데이트된 사용자
-     */
-    fun update(user: User): User {
-        dsl.update(USERS)
-            .set(USERS.ROLE, user.role.name)
-            .set(USERS.IS_CREATOR, user.isCreator)
-            .where(USERS.ID.eq(user.id))
-            .execute()
-
-        return user
     }
 
     /**
@@ -99,12 +84,11 @@ class UserRepository(
      */
     private fun mapToUser(record: me.onetwo.growsnap.jooq.generated.tables.records.UsersRecord): User {
         return User(
-            id = record.id,
+            id = UUID.fromString(record.id!!),
             email = record.email!!,
             provider = OAuthProvider.valueOf(record.provider!!),
             providerId = record.providerId!!,
             role = UserRole.valueOf(record.role!!),
-            isCreator = record.isCreator ?: false,
             createdAt = record.createdAt!!,
             updatedAt = record.updatedAt!!
         )

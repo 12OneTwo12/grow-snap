@@ -7,6 +7,7 @@ import me.onetwo.growsnap.domain.user.model.Follow
 import me.onetwo.growsnap.domain.user.repository.FollowRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 /**
  * 팔로우 관리 서비스
@@ -38,7 +39,7 @@ class FollowService(
      * @throws AlreadyFollowingException 이미 팔로우 중인 경우
      */
     @Transactional
-    fun follow(followerId: Long, followingId: Long): Follow {
+    fun follow(followerId: UUID, followingId: UUID): Follow {
         // 자기 자신 팔로우 방지
         if (followerId == followingId) {
             throw CannotFollowSelfException()
@@ -78,7 +79,7 @@ class FollowService(
      * @throws NotFollowingException 팔로우하지 않은 사용자를 언팔로우하려는 경우
      */
     @Transactional
-    fun unfollow(followerId: Long, followingId: Long) {
+    fun unfollow(followerId: UUID, followingId: UUID) {
         // 사용자 존재 여부 확인
         userService.getUserById(followerId)
         userService.getUserById(followingId)
@@ -103,7 +104,7 @@ class FollowService(
      * @param followingId 팔로우받는 사용자 ID
      * @return 팔로우 여부 (true: 팔로우 중, false: 팔로우하지 않음)
      */
-    fun isFollowing(followerId: Long, followingId: Long): Boolean {
+    fun isFollowing(followerId: UUID, followingId: UUID): Boolean {
         return followRepository.existsByFollowerIdAndFollowingId(followerId, followingId)
     }
 
@@ -113,7 +114,7 @@ class FollowService(
      * @param userId 사용자 ID
      * @return 팔로잉 수
      */
-    fun getFollowingCount(userId: Long): Int {
+    fun getFollowingCount(userId: UUID): Int {
         return followRepository.countByFollowerId(userId)
     }
 
@@ -123,7 +124,7 @@ class FollowService(
      * @param userId 사용자 ID
      * @return 팔로워 수
      */
-    fun getFollowerCount(userId: Long): Int {
+    fun getFollowerCount(userId: UUID): Int {
         return followRepository.countByFollowingId(userId)
     }
 }

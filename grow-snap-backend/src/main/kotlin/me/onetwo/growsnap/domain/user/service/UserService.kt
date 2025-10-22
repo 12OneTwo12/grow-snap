@@ -4,10 +4,10 @@ import me.onetwo.growsnap.domain.user.exception.DuplicateEmailException
 import me.onetwo.growsnap.domain.user.exception.UserNotFoundException
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
-import me.onetwo.growsnap.domain.user.model.UserRole
 import me.onetwo.growsnap.domain.user.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 /**
  * 사용자 관리 서비스
@@ -47,9 +47,7 @@ class UserService(
         val newUser = User(
             email = email,
             provider = provider,
-            providerId = providerId,
-            role = UserRole.USER,
-            isCreator = false
+            providerId = providerId
         )
 
         return userRepository.save(newUser)
@@ -62,7 +60,7 @@ class UserService(
      * @return 사용자 정보
      * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
      */
-    fun getUserById(userId: Long): User {
+    fun getUserById(userId: UUID): User {
         return userRepository.findById(userId)
             ?: throw UserNotFoundException("사용자를 찾을 수 없습니다. ID: $userId")
     }
@@ -87,43 +85,5 @@ class UserService(
      */
     fun isEmailDuplicated(email: String): Boolean {
         return userRepository.findByEmail(email) != null
-    }
-
-    /**
-     * 사용자를 크리에이터로 전환
-     *
-     * @param userId 사용자 ID
-     * @return 업데이트된 사용자 정보
-     * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
-     */
-    @Transactional
-    fun convertToCreator(userId: Long): User {
-        val user = getUserById(userId)
-
-        if (user.isCreator) {
-            return user
-        }
-
-        val updatedUser = user.copy(
-            role = UserRole.CREATOR,
-            isCreator = true
-        )
-
-        return userRepository.update(updatedUser)
-    }
-
-    /**
-     * 사용자 정보 업데이트
-     *
-     * @param user 업데이트할 사용자 정보
-     * @return 업데이트된 사용자 정보
-     * @throws UserNotFoundException 사용자를 찾을 수 없는 경우
-     */
-    @Transactional
-    fun updateUser(user: User): User {
-        // 사용자 존재 여부 확인
-        getUserById(user.id!!)
-
-        return userRepository.update(user)
     }
 }

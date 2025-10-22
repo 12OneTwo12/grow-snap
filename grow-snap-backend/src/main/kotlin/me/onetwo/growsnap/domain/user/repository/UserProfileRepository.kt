@@ -4,6 +4,7 @@ import me.onetwo.growsnap.jooq.generated.tables.references.USER_PROFILES
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
+import java.util.UUID
 
 /**
  * 사용자 프로필 Repository
@@ -14,7 +15,7 @@ class UserProfileRepository(
 ) {
     fun save(profile: UserProfile): UserProfile {
         val record = dsl.insertInto(USER_PROFILES)
-            .set(USER_PROFILES.USER_ID, profile.userId)
+            .set(USER_PROFILES.USER_ID, profile.userId.toString())
             .set(USER_PROFILES.NICKNAME, profile.nickname)
             .set(USER_PROFILES.PROFILE_IMAGE_URL, profile.profileImageUrl)
             .set(USER_PROFILES.BIO, profile.bio)
@@ -24,9 +25,9 @@ class UserProfileRepository(
         return profile.copy(id = record.id)
     }
 
-    fun findByUserId(userId: Long): UserProfile? {
+    fun findByUserId(userId: UUID): UserProfile? {
         return dsl.selectFrom(USER_PROFILES)
-            .where(USER_PROFILES.USER_ID.eq(userId))
+            .where(USER_PROFILES.USER_ID.eq(userId.toString()))
             .fetchOne()
             ?.let { mapToUserProfile(it) }
     }
@@ -45,7 +46,7 @@ class UserProfileRepository(
             .set(USER_PROFILES.BIO, profile.bio)
             .set(USER_PROFILES.FOLLOWER_COUNT, profile.followerCount)
             .set(USER_PROFILES.FOLLOWING_COUNT, profile.followingCount)
-            .where(USER_PROFILES.USER_ID.eq(profile.userId))
+            .where(USER_PROFILES.USER_ID.eq(profile.userId.toString()))
             .execute()
 
         return profile
@@ -61,7 +62,7 @@ class UserProfileRepository(
     private fun mapToUserProfile(record: me.onetwo.growsnap.jooq.generated.tables.records.UserProfilesRecord): UserProfile {
         return UserProfile(
             id = record.id,
-            userId = record.userId!!,
+            userId = UUID.fromString(record.userId!!),
             nickname = record.nickname!!,
             profileImageUrl = record.profileImageUrl,
             bio = record.bio,

@@ -2,14 +2,15 @@ package me.onetwo.growsnap.domain.user.dto
 
 import me.onetwo.growsnap.domain.user.model.Follow
 import java.time.LocalDateTime
+import java.util.UUID
 
 /**
  * 팔로우 응답 DTO
  */
 data class FollowResponse(
     val id: Long,
-    val followerId: Long,
-    val followingId: Long,
+    val followerId: UUID,
+    val followingId: UUID,
     val createdAt: LocalDateTime
 ) {
     companion object {
@@ -28,8 +29,8 @@ data class FollowResponse(
  * 팔로우 관계 확인 응답 DTO
  */
 data class FollowCheckResponse(
-    val followerId: Long,
-    val followingId: Long,
+    val followerId: UUID,
+    val followingId: UUID,
     val isFollowing: Boolean
 )
 
@@ -37,7 +38,7 @@ data class FollowCheckResponse(
  * 팔로우 통계 응답 DTO
  */
 data class FollowStatsResponse(
-    val userId: Long,
+    val userId: UUID,
     val followerCount: Int,
     val followingCount: Int
 )

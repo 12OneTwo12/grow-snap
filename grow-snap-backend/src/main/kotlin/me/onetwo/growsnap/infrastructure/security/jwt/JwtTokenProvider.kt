@@ -32,7 +32,7 @@ class JwtTokenProvider(
      * @param role 사용자 역할
      * @return 생성된 JWT Access Token
      */
-    fun generateAccessToken(userId: Long, email: String, role: UserRole): String {
+    fun generateAccessToken(userId: UUID, email: String, role: UserRole): String {
         val now = Date()
         val expiryDate = Date(now.time + jwtProperties.accessTokenExpiration)
 
@@ -52,7 +52,7 @@ class JwtTokenProvider(
      * @param userId 사용자 ID
      * @return 생성된 JWT Refresh Token
      */
-    fun generateRefreshToken(userId: Long): String {
+    fun generateRefreshToken(userId: UUID): String {
         val now = Date()
         val expiryDate = Date(now.time + jwtProperties.refreshTokenExpiration)
 
@@ -71,9 +71,9 @@ class JwtTokenProvider(
      * @return 사용자 ID
      * @throws io.jsonwebtoken.JwtException 토큰이 유효하지 않은 경우
      */
-    fun getUserIdFromToken(token: String): Long {
+    fun getUserIdFromToken(token: String): UUID {
         val claims = getClaims(token)
-        return claims.subject.toLong()
+        return UUID.fromString(claims.subject)
     }
 
     /**
