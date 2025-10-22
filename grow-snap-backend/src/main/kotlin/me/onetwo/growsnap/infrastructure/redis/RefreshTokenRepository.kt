@@ -3,6 +3,7 @@ package me.onetwo.growsnap.infrastructure.redis
 import me.onetwo.growsnap.infrastructure.security.jwt.JwtProperties
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Repository
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 /**
@@ -29,7 +30,7 @@ class RefreshTokenRepository(
      * @param userId 사용자 ID
      * @param refreshToken Refresh Token
      */
-    fun save(userId: Long, refreshToken: String) {
+    fun save(userId: UUID, refreshToken: String) {
         val key = getKey(userId)
         redisTemplate.opsForValue().set(
             key,
@@ -45,7 +46,7 @@ class RefreshTokenRepository(
      * @param userId 사용자 ID
      * @return Refresh Token (존재하지 않으면 null)
      */
-    fun findByUserId(userId: Long): String? {
+    fun findByUserId(userId: UUID): String? {
         val key = getKey(userId)
         return redisTemplate.opsForValue().get(key)
     }
@@ -55,7 +56,7 @@ class RefreshTokenRepository(
      *
      * @param userId 사용자 ID
      */
-    fun deleteByUserId(userId: Long) {
+    fun deleteByUserId(userId: UUID) {
         val key = getKey(userId)
         redisTemplate.delete(key)
     }
@@ -66,7 +67,7 @@ class RefreshTokenRepository(
      * @param userId 사용자 ID
      * @return 존재하면 true, 그렇지 않으면 false
      */
-    fun existsByUserId(userId: Long): Boolean {
+    fun existsByUserId(userId: UUID): Boolean {
         val key = getKey(userId)
         return redisTemplate.hasKey(key)
     }
@@ -77,7 +78,7 @@ class RefreshTokenRepository(
      * @param userId 사용자 ID
      * @return Redis Key
      */
-    private fun getKey(userId: Long): String {
+    private fun getKey(userId: UUID): String {
         return "$KEY_PREFIX$userId"
     }
 }

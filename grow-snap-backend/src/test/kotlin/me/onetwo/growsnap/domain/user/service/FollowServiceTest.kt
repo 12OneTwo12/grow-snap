@@ -1,10 +1,10 @@
 package me.onetwo.growsnap.domain.user.service
 
-import java.util.UUID
 import io.mockk.every
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
 import io.mockk.verify
+import java.util.UUID
 import me.onetwo.growsnap.domain.user.exception.AlreadyFollowingException
 import me.onetwo.growsnap.domain.user.exception.CannotFollowSelfException
 import me.onetwo.growsnap.domain.user.exception.NotFollowingException
@@ -62,14 +62,14 @@ class FollowServiceTest {
         )
 
         followerProfile = UserProfile(
-            id = 1L,
+            id = null,
             userId = UUID.randomUUID(),
             nickname = "follower",
             followingCount = 0
         )
 
         followingProfile = UserProfile(
-            id = 1L,
+            id = null,
             userId = UUID.randomUUID(),
             nickname = "following",
             followerCount = 0
@@ -84,7 +84,7 @@ class FollowServiceTest {
         val followingId = UUID.randomUUID()
 
         val follow = Follow(
-            id = 1L,
+            id = null,
             followerId = followerId,
             followingId = followingId
         )
