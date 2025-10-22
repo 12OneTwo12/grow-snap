@@ -38,7 +38,7 @@ class UserProfileServiceTest {
     fun setUp() {
         userProfileRepository = mockk()
         userService = mockk()
-        userProfileService = UserProfileService(userProfileRepository, userService)
+        userProfileService = UserProfileServiceImpl(userProfileRepository, userService)
 
         val testUserId = UUID.randomUUID()
 
