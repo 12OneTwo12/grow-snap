@@ -5,8 +5,11 @@ import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationFai
 import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationSuccessHandler
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
 import org.springframework.security.config.web.server.ServerHttpSecurity
+import org.springframework.security.oauth2.client.authentication.OAuth2LoginReactiveAuthenticationManager
+import org.springframework.security.oauth2.client.endpoint.WebClientReactiveAuthorizationCodeTokenResponseClient
 import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.reactive.CorsConfigurationSource
@@ -58,9 +61,23 @@ class SecurityConfig(
                 oauth2
                     .authenticationSuccessHandler(oAuth2SuccessHandler)
                     .authenticationFailureHandler(oAuth2FailureHandler)
-                    .authorizedClientRepository(null) // Stateless - Redis에서 관리
+                    // CustomReactiveOAuth2UserService를 사용하는 AuthenticationManager 등록
+                    .authenticationManager(oauth2AuthenticationManager())
             }
             .build()
+    }
+
+    /**
+     * OAuth2 인증 매니저 설정
+     *
+     * CustomReactiveOAuth2UserService를 사용하여 OAuth2 사용자 정보를 처리합니다.
+     *
+     * @return ReactiveAuthenticationManager
+     */
+    @Bean
+    fun oauth2AuthenticationManager(): ReactiveAuthenticationManager {
+        val tokenResponseClient = WebClientReactiveAuthorizationCodeTokenResponseClient()
+        return OAuth2LoginReactiveAuthenticationManager(tokenResponseClient, customOAuth2UserService)
     }
 
     /**

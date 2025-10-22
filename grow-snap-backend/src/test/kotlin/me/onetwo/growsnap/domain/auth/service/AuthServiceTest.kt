@@ -40,7 +40,7 @@ class AuthServiceTest {
         jwtTokenProvider = mockk()
         refreshTokenRepository = mockk()
         userService = mockk()
-        authService = AuthService(jwtTokenProvider, refreshTokenRepository, userService)
+        authService = AuthServiceImpl(jwtTokenProvider, refreshTokenRepository, userService)
 
         testUserId = UUID.randomUUID()
         testUser = User(
