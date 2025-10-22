@@ -65,6 +65,76 @@ grow-snap-backend/
 **Repository**: 데이터베이스 CRUD (JOOQ 사용)
 **Model**: 도메인 엔티티
 
+### 서비스 간 의존성 패턴 (Service-to-Service Dependency)
+
+#### ✅ 허용되는 패턴 (Best Practice)
+
+서비스에서 다른 서비스를 의존하는 것은 안티패턴은 아닙니다
+
+```kotlin
+// ✅ GOOD: 단방향 의존성
+@Service
+class UserProfileServiceImpl(
+    private val userProfileRepository: UserProfileRepository,
+    private val userService: UserService  // OK! 다른 서비스 의존
+) : UserProfileService {
+
+    override fun getProfile(userId: UUID): Mono<UserProfileResponse> {
+        // 다른 서비스 호출은 문제없음
+        return userService.findById(userId)
+            .flatMap { user ->
+                userProfileRepository.findByUserId(userId)
+                    .map { profile -> profile.toResponse(user) }
+            }
+    }
+}
+```
+
+#### ⚠️ 주의사항
+
+**1. 순환 의존성 금지 (Circular Dependency)**
+
+```kotlin
+// ❌ BAD: 순환 의존성 발생
+class UserService(private val profileService: ProfileService)
+class ProfileService(private val userService: UserService)  // 순환!
+```
+
+**2. 복잡도 관리 - Facade 패턴 활용**
+
+```kotlin
+// ⚠️ 3개 이상의 서비스 의존 시 Facade 패턴 고려
+@Service
+class UserProfileFacade(
+    private val userService: UserService,
+    private val profileService: UserProfileService,
+    private val imageService: ImageUploadService,
+    private val followService: FollowService
+) {
+    /**
+     * 여러 서비스를 조율하는 복잡한 로직은 Facade에서 처리
+     */
+    fun createCompleteProfile(request: CreateProfileRequest): Mono<CompleteProfileResponse> {
+        return userService.create(request.user)
+            .flatMap { user ->
+                profileService.create(user.id, request.profile)
+                    .flatMap { profile ->
+                        imageService.upload(user.id, request.image)
+                            .map { CompleteProfileResponse(user, profile, it) }
+                    }
+            }
+    }
+}
+```
+
+#### 📋 서비스 의존성 체크리스트
+
+- [ ] **단방향 의존성**: A → B는 허용, 하지만 B → A는 금지 (순환 의존 방지)
+- [ ] **의존 이유 명확**: 왜 이 서비스가 필요한가? 책임이 명확한가?
+- [ ] **복잡도 관리**: 3개 이상 서비스 의존 시 Facade/Orchestration 패턴 고려
+- [ ] **SRP 준수**: 각 서비스의 단일 책임 원칙이 지켜지는가?
+- [ ] **테스트 가능성**: 의존성 때문에 테스트가 어려워지지 않는가?
+
 ---
 
 ## 🔄 개발 프로세스 (항상 이 순서로)
@@ -304,6 +374,145 @@ GET    /api/v1/videos/get/{id}     # 불필요한 동사
 org.springframework.http.ResponseEntity 사용할것
 ```
 
+### WebFlux Controller 반환 타입 패턴
+
+**원칙: 일관성 있게 `Mono<ResponseEntity<T>>` 패턴 사용**
+
+#### 1. `Mono<ResponseEntity<T>>` - **권장 패턴** ✅
+
+**사용 시기**: 대부분의 경우 (기본 패턴)
+
+- HTTP 상태 코드, 헤더, 바디 모두를 비동기적으로 결정
+- 비동기 처리 결과에 따라 상태 코드를 다르게 반환 가능
+- 에러 핸들링이 유연함
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/users")
+class UserController(private val userService: UserService) {
+
+    /**
+     * ✅ GOOD: Mono<ResponseEntity<T>> 패턴
+     *
+     * 비동기 처리 결과에 따라 상태 코드를 다르게 반환 가능
+     */
+    @GetMapping("/{id}")
+    fun getUser(@PathVariable id: UUID): Mono<ResponseEntity<UserResponse>> {
+        return userService.findById(id)
+            .map { user -> ResponseEntity.ok(user) }              // 200 OK
+            .defaultIfEmpty(ResponseEntity.notFound().build())     // 404 Not Found
+    }
+
+    @PostMapping
+    fun createUser(@RequestBody request: UserCreateRequest): Mono<ResponseEntity<UserResponse>> {
+        return userService.create(request)
+            .map { user -> ResponseEntity.status(HttpStatus.CREATED).body(user) }  // 201 Created
+    }
+
+    @DeleteMapping("/{id}")
+    fun deleteUser(@PathVariable id: UUID): Mono<ResponseEntity<Void>> {
+        return userService.delete(id)
+            .then(Mono.just(ResponseEntity.noContent().build<Void>()))  // 204 No Content
+    }
+}
+```
+
+#### 2. `ResponseEntity<Mono<T>>` - **제한적 사용** ⚠️
+
+**사용 시기**: 상태 코드와 헤더를 즉시 결정할 수 있고, 바디만 비동기 처리
+
+- 상태 코드와 헤더가 미리 확정됨
+- 바디 데이터만 비동기로 제공
+- **대부분의 경우 `Mono<ResponseEntity<T>>`가 더 적합**
+
+```kotlin
+// ⚠️ 제한적 사용: 상태 코드가 항상 200 OK로 확정된 경우
+@GetMapping("/stats")
+fun getStats(): ResponseEntity<Mono<StatsResponse>> {
+    // 상태 코드는 즉시 200 OK로 결정, 바디만 비동기 처리
+    return ResponseEntity.ok(userService.calculateStats())
+}
+```
+
+#### 3. `Mono<T>` - **간단한 경우** ⚠️
+
+**사용 시기**: 항상 200 OK를 반환하는 단순한 경우
+
+- HTTP 상태 코드를 커스터마이즈할 필요가 없을 때
+- Spring WebFlux가 자동으로 200 OK 반환
+- **하지만 명시적으로 `Mono<ResponseEntity<T>>`를 사용하는 것이 더 명확함**
+
+```kotlin
+// ⚠️ 간단하지만 명시적이지 않음
+@GetMapping("/simple")
+fun getSimple(): Mono<UserResponse> {
+    return userService.findById(userId)  // 자동으로 200 OK
+}
+
+// ✅ BETTER: 명시적으로 상태 코드 지정
+@GetMapping("/simple")
+fun getSimple(): Mono<ResponseEntity<UserResponse>> {
+    return userService.findById(userId)
+        .map { ResponseEntity.ok(it) }  // 명시적으로 200 OK
+}
+```
+
+#### 4. `Flux<T>` vs `Mono<ResponseEntity<Flux<T>>>` - **스트리밍**
+
+**스트리밍 응답 (Server-Sent Events, Streaming JSON)**
+
+```kotlin
+// ✅ GOOD: 스트리밍 응답 (여러 개의 데이터를 순차적으로 전송)
+@GetMapping(value = ["/stream"], produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+fun streamUsers(): Flux<UserResponse> {
+    return userService.findAll()  // 스트리밍으로 전송
+}
+
+// ✅ GOOD: 컬렉션을 한 번에 반환
+@GetMapping("/all")
+fun getAllUsers(): Mono<ResponseEntity<List<UserResponse>>> {
+    return userService.findAll()
+        .collectList()
+        .map { ResponseEntity.ok(it) }
+}
+```
+
+#### 📋 WebFlux Controller 반환 타입 선택 가이드
+
+| 상황 | 권장 반환 타입 | 이유 |
+|------|--------------|------|
+| **일반적인 CRUD API** | `Mono<ResponseEntity<T>>` | 상태 코드, 헤더, 바디 모두 비동기 결정 |
+| **조건부 상태 코드** (200/404) | `Mono<ResponseEntity<T>>` | `defaultIfEmpty()`로 404 처리 |
+| **리스트 반환** | `Mono<ResponseEntity<List<T>>>` | `collectList()`로 변환 후 반환 |
+| **스트리밍 응답** (SSE) | `Flux<T>` | Server-Sent Events 스트리밍 |
+| **삭제 API** (바디 없음) | `Mono<ResponseEntity<Void>>` | 204 No Content |
+| **생성 API** | `Mono<ResponseEntity<T>>` | 201 Created |
+
+#### ❌ 피해야 할 패턴
+
+```kotlin
+// ❌ BAD: 블로킹 호출
+@GetMapping("/{id}")
+fun getUser(@PathVariable id: UUID): ResponseEntity<UserResponse> {
+    val user = userService.findById(id).block()!!  // 블로킹!
+    return ResponseEntity.ok(user)
+}
+
+// ❌ BAD: ResponseEntity를 Mono로 감싸지 않음 (비일관성)
+@GetMapping("/inconsistent")
+fun inconsistentReturn(): UserResponse {
+    // 상태 코드 제어 불가
+}
+```
+
+#### 💡 정리
+
+1. **기본 패턴**: `Mono<ResponseEntity<T>>` 사용 (가장 유연함)
+2. **상태 코드 제어**: `.map { ResponseEntity.status(...).body(it) }`
+3. **404 처리**: `.defaultIfEmpty(ResponseEntity.notFound().build())`
+4. **스트리밍**: `Flux<T>`만 사용 (SSE, Streaming JSON)
+5. **일관성 유지**: 프로젝트 전체에서 동일한 패턴 사용
+
 ---
 
 ## 📚 REST Docs 작성 (필수)
@@ -477,51 +686,6 @@ fun processVideos(): Flux<ProcessedVideo> {
         .flatMap { video -> videoProcessor.process(video) }
 }
 ```
-
----
-
-## 📦 Git Convention
-
-### 커밋 메시지 형식
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Type
-- `feat`: 새로운 기능
-- `fix`: 버그 수정
-- `test`: 테스트 추가/수정
-- `refactor`: 리팩토링
-- `docs`: 문서 수정
-- `chore`: 빌드 설정
-
-### 예시
-
-```bash
-feat(video): Add video upload API
-
-비디오 업로드 기능 구현
-- S3 Presigned URL 생성
-- 비디오 메타데이터 저장
-- 업로드 완료 알림
-
-Closes #123
-```
-
-### 브랜치 네이밍
-
-```
-feature/video-upload
-fix/auth-token-bug
-refactor/video-service
-test/video-controller
-```
-
 ---
 
 ## ✔️ 코드 리뷰 체크리스트
@@ -541,7 +705,7 @@ test/video-controller
 - [ ] **RESTful**: URL 설계가 RESTful한가?
 - [ ] **HTTP 상태 코드**: 올바르게 사용했는가?
 - [ ] **커밋 메시지**: Convention을 따랐는가?
-- [ ] **성능**: N+1 문제는 없는가?
+- [ ] **성능**: 성능 문제는 없는가?
 - [ ] **가독성**: 코드를 이해하기 쉬운가?
 
 ---
