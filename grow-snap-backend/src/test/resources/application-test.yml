@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: grow-snap-backend-test
+
+  # H2 Database for Testing
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+
+  # H2 Console (optional for debugging)
+  h2:
+    console:
+      enabled: true
+
+  # Redis Configuration (Embedded Redis or TestContainers)
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # SQL Initialization
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/create-table-sql.sql
+
+# JWT Configuration
+jwt:
+  secret: test-secret-key-for-jwt-token-generation-minimum-256-bits-required-for-testing
+  access-token-expiration: 3600000  # 1시간
+  refresh-token-expiration: 1209600000  # 14일
+
+# Logging
+logging:
+  level:
+    root: INFO
+    me.onetwo.growsnap: DEBUG
+    org.jooq: DEBUG
+    org.springframework.test: DEBUG

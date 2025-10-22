@@ -1,0 +1,88 @@
+package me.onetwo.growsnap.infrastructure.security.config
+
+import me.onetwo.growsnap.infrastructure.security.jwt.JwtAuthenticationWebFilter
+import me.onetwo.growsnap.infrastructure.security.oauth2.CustomReactiveOAuth2UserService
+import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationFailureHandler
+import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationSuccessHandler
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.security.authentication.ReactiveAuthenticationManager
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder
+import org.springframework.security.config.web.server.ServerHttpSecurity
+import org.springframework.security.oauth2.client.authentication.OAuth2LoginReactiveAuthenticationManager
+import org.springframework.security.oauth2.client.endpoint.WebClientReactiveAuthorizationCodeTokenResponseClient
+import org.springframework.security.web.server.SecurityWebFilterChain
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.reactive.CorsConfigurationSource
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource
+
+/**
+ * Spring Security 설정
+ *
+ * OAuth2 로그인, JWT 인증, CORS, 인증/인가 규칙을 설정합니다.
+ */
+@Configuration
+@EnableWebFluxSecurity
+class SecurityConfig(
+    private val customOAuth2UserService: CustomReactiveOAuth2UserService,
+    private val oAuth2SuccessHandler: OAuth2AuthenticationSuccessHandler,
+    private val oAuth2FailureHandler: OAuth2AuthenticationFailureHandler
+) {
+
+    /**
+     * Spring Security 필터 체인 설정
+     *
+     * OAuth2 로그인, JWT 인증, CORS, CSRF, 인증/인가 규칙을 구성합니다.
+     */
+    @Bean
+    fun securityWebFilterChain(
+        http: ServerHttpSecurity,
+        jwtAuthenticationWebFilter: JwtAuthenticationWebFilter
+    ): SecurityWebFilterChain {
+        return http
+            .csrf { it.disable() }
+            .cors { it.configurationSource(corsConfigurationSource()) }
+            .addFilterAt(jwtAuthenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+            .authorizeExchange { authorize ->
+                authorize
+                    // 인증이 필요 없는 공개 API
+                    .pathMatchers(*PublicApiPaths.AUTH_ENDPOINTS).permitAll()
+                    // 조회 전용 공개 API (GET 메서드만 허용)
+                    .pathMatchers(PublicApiPaths.GetOnly.METHOD, *PublicApiPaths.GetOnly.PATHS).permitAll()
+                    // 나머지는 인증 필요
+                    .anyExchange().authenticated()
+            }
+            .oauth2Login { oauth2 ->
+                oauth2
+                    .authenticationSuccessHandler(oAuth2SuccessHandler)
+                    .authenticationFailureHandler(oAuth2FailureHandler)
+                    .authenticationManager(oauth2AuthenticationManager())
+            }
+            .build()
+    }
+
+    @Bean
+    fun oauth2AuthenticationManager(): ReactiveAuthenticationManager {
+        val tokenResponseClient = WebClientReactiveAuthorizationCodeTokenResponseClient()
+        return OAuth2LoginReactiveAuthenticationManager(tokenResponseClient, customOAuth2UserService)
+    }
+
+    @Bean
+    fun corsConfigurationSource(): CorsConfigurationSource {
+        val configuration = CorsConfiguration().apply {
+            allowedOrigins = listOf(
+                "http://localhost:3000",
+                "http://localhost:5173"
+            )
+            allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            allowedHeaders = listOf("*")
+            allowCredentials = true
+            maxAge = 3600L
+        }
+
+        return UrlBasedCorsConfigurationSource().apply {
+            registerCorsConfiguration("/**", configuration)
+        }
+    }
+}

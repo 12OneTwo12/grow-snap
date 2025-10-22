@@ -38,3 +38,6 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### JOOQ Generated Code ###
+src/main/generated/

@@ -39,9 +39,38 @@ dependencies {
     runtimeOnly("com.mysql:mysql-connector-j")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-    testImplementation("org.springframework.restdocs:spring-restdocs-mockmvc")
+    testImplementation("org.springframework.restdocs:spring-restdocs-webtestclient")
     testImplementation("org.springframework.security:spring-security-test")
+    testImplementation("io.projectreactor:reactor-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // MockK for Kotlin testing
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("com.ninja-squad:springmockk:4.0.2")
+
+    // OAuth2 Client
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+
+    // JWT
+    implementation("io.jsonwebtoken:jjwt-api:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
+
+    // Redis Reactive
+    implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
+
+    // BCrypt
+    implementation("org.springframework.security:spring-security-crypto")
+
+    // AWS S3 for image upload (Spring Cloud AWS)
+    implementation(platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.0.3"))
+    implementation("io.awspring.cloud:spring-cloud-aws-starter-s3")
+
+    // Image processing (Thumbnailator for resizing)
+    implementation("net.coobird:thumbnailator:0.4.20")
+
+    // JDBC for JOOQ
+    implementation("org.springframework.boot:spring-boot-starter-jdbc")
 
     // JOOQ 기본 런타임 라이브러리
     implementation("org.jooq:jooq:$jooqVersion")
@@ -163,6 +192,10 @@ detekt {
     ignoreFailures = true // detekt 빌드시 실패 ignore 처리
 }
 
+// JOOQ 설정
+// Note: JOOQ Gradle 플러그인의 XML 스키마 검증 경고는 무시해도 됩니다.
+// 이는 플러그인의 알려진 이슈이며 실제 코드 생성과 빌드에는 영향이 없습니다.
+// https://github.com/etiennestuder/gradle-jooq-plugin/issues
 jooq {
     version.set(jooqVersion)
 
@@ -197,12 +230,16 @@ jooq {
                     }
 
                     generate.apply {
-                        isPojos = true  // Kotlin 데이터 클래스로 생성
-                        isDaos = true   // DAO 클래스 생성
+                        // 도메인 모델을 별도로 관리하므로 JOOQ POJO/DAO는 생성하지 않음
+                        isPojos = false
+                        isDaos = false
+                        isRecords = true
+                        isFluentSetters = false
+                        isJavaTimeTypes = true
                     }
 
                     target.apply {
-                        packageName = "com.onetwo.growsnap.jooq.generated" // JOOQ 코드 저장 경로
+                        packageName = "me.onetwo.growsnap.jooq.generated" // JOOQ 코드 저장 경로
                         directory = "src/main/generated"
                     }
                 }
