@@ -8,6 +8,9 @@
 - **항상 테스트 코드를 먼저 작성**
 - 순서: Red (실패하는 테스트) → Green (통과하는 최소 코드) → Refactor (리팩토링)
 - 모든 public 메서드는 테스트 필수
+- **모든 테스트는 시나리오 기반으로 작성**: 테스트만 보고 즉시 기능을 파악할 수 있어야 함
+- **Given-When-Then 주석 필수**: 모든 테스트에 `// Given`, `// When`, `// Then` 주석 작성
+- **DisplayName 필수**: 테스트 시나리오를 명확히 설명하는 한글 설명 (예: "유효한 요청으로 비디오 생성 시, 201과 비디오 정보를 반환한다")
 
 ### 2. SOLID 원칙
 - **S**ingle Responsibility: 한 클래스는 한 가지 책임만
@@ -21,10 +24,12 @@
 - **모든 API 엔드포인트에 REST Docs 작성**
 - AsciiDoc 자동 생성 확인
 
-### 4. 테스트
+### 4. 테스트 작성 규칙
 - **단위 테스트는 MockK로 모킹 필수**
-- **DisplayName은 시나리오 기반으로 작성** (예: "유효한 요청으로 비디오 생성 시, 201과 비디오 정보를 반환한다")
-- Given-When-Then 패턴 준수
+- **시나리오 기반 테스트**: 테스트 이름만 보고 무엇을 검증하는지 즉시 파악 가능해야 함
+- **Given-When-Then 주석 필수**: 모든 테스트에 명시적으로 작성
+- **DisplayName 필수**: 한글로 명확한 시나리오 설명 (예: "유효한 요청으로 비디오 생성 시, 201과 비디오 정보를 반환한다")
+- **테스트 완료 후 빌드/테스트 실행**: 모든 테스트가 통과해야만 작업 완료
 
 ### 5. Git Convention
 - 커밋 메시지: `feat(video): Add video upload API`
@@ -548,8 +553,11 @@ test/video-controller
 
 - [ ] **TDD**: 테스트 코드를 먼저 작성했는가?
 - [ ] **테스트 통과**: 모든 테스트가 통과하는가?
+- [ ] **빌드 성공**: ./gradlew build가 성공하는가?
 - [ ] **모킹**: 단위 테스트에서 MockK를 사용했는가?
-- [ ] **DisplayName**: 시나리오 기반으로 작성했는가?
+- [ ] **시나리오 기반**: 테스트만 보고 기능을 즉시 파악할 수 있는가?
+- [ ] **Given-When-Then**: 모든 테스트에 주석을 작성했는가?
+- [ ] **DisplayName**: 시나리오를 명확히 설명하는 한글 설명을 작성했는가?
 - [ ] **KDoc**: 모든 public 함수/클래스에 작성했는가?
 - [ ] **REST Docs**: 모든 API에 document()를 추가했는가?
 - [ ] **SOLID**: 단일 책임 원칙을 지켰는가?
@@ -664,16 +672,17 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 
 ## 🎯 요약: Claude가 반드시 지킬 것
 
-1. **TDD**: 테스트 → 구현 → 리팩토링
-2. **SOLID**: 단일 책임, 인터페이스 분리, 의존성 역전
-3. **KDoc**: 모든 public 함수/클래스
-4. **REST Docs**: 모든 API
-5. **DisplayName**: 시나리오 기반
-6. **MockK**: 단위 테스트 모킹
-7. **Git Convention**: `feat(scope): subject`
-8. **MVC 패턴**: Controller → Service → Repository
-9. **성능 vs 가독성**: 가독성 우선, 필요시 최적화
-10. **RESTful API**: 동사 금지, 적절한 HTTP 메서드/상태 코드
+1. **TDD**: 테스트 → 구현 → 리팩토링 (시나리오 기반, Given-When-Then 주석 필수)
+2. **테스트 검증**: 구현 후 반드시 빌드/테스트 실행, 통과해야만 완료
+3. **SOLID**: 단일 책임, 인터페이스 분리, 의존성 역전
+4. **KDoc**: 모든 public 함수/클래스
+5. **REST Docs**: 모든 API
+6. **DisplayName**: 시나리오를 명확히 설명하는 한글 설명
+7. **MockK**: 단위 테스트 모킹
+8. **Git Convention**: `feat(scope): subject`
+9. **MVC 패턴**: Controller → Service → Repository
+10. **성능 vs 가독성**: 가독성 우선, 필요시 최적화
+11. **RESTful API**: 동사 금지, 적절한 HTTP 메서드/상태 코드
 
 ---
 
