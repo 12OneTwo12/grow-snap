@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import reactor.core.publisher.Mono
 
 /**
  * 인증 컨트롤러
@@ -35,9 +36,11 @@ class AuthController(
     @PostMapping("/refresh")
     fun refreshToken(
         @Valid @RequestBody request: RefreshTokenRequest
-    ): ResponseEntity<RefreshTokenResponse> {
-        val response = authService.refreshAccessToken(request.refreshToken)
-        return ResponseEntity.ok(response)
+    ): Mono<ResponseEntity<RefreshTokenResponse>> {
+        return Mono.fromCallable {
+            val response = authService.refreshAccessToken(request.refreshToken)
+            ResponseEntity.ok(response)
+        }
     }
 
     /**
@@ -51,8 +54,9 @@ class AuthController(
     @PostMapping("/logout")
     fun logout(
         @Valid @RequestBody request: LogoutRequest
-    ): ResponseEntity<Void> {
-        authService.logout(request.refreshToken)
-        return ResponseEntity.noContent().build()
+    ): Mono<ResponseEntity<Void>> {
+        return Mono.fromRunnable<Void> {
+            authService.logout(request.refreshToken)
+        }.then(Mono.just(ResponseEntity.noContent().build<Void>()))
     }
 }

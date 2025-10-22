@@ -2,6 +2,7 @@ package me.onetwo.growsnap.domain.user.controller
 
 import me.onetwo.growsnap.domain.user.dto.UserResponse
 import me.onetwo.growsnap.domain.user.service.UserService
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestAttribute
@@ -30,10 +31,10 @@ class UserController(
     @GetMapping("/me")
     fun getMe(
         @RequestAttribute userId: UUID
-    ): Mono<UserResponse> {
+    ): Mono<ResponseEntity<UserResponse>> {
         return Mono.fromCallable {
             val user = userService.getUserById(userId)
-            UserResponse.from(user)
+            ResponseEntity.ok(UserResponse.from(user))
         }
     }
 
@@ -46,10 +47,10 @@ class UserController(
     @GetMapping("/{targetUserId}")
     fun getUserById(
         @PathVariable targetUserId: UUID
-    ): Mono<UserResponse> {
+    ): Mono<ResponseEntity<UserResponse>> {
         return Mono.fromCallable {
             val user = userService.getUserById(targetUserId)
-            UserResponse.from(user)
+            ResponseEntity.ok(UserResponse.from(user))
         }
     }
 }

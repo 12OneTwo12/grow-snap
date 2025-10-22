@@ -5,13 +5,13 @@ import me.onetwo.growsnap.domain.user.dto.FollowResponse
 import me.onetwo.growsnap.domain.user.dto.FollowStatsResponse
 import me.onetwo.growsnap.domain.user.service.FollowService
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestAttribute
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
 import java.util.UUID
@@ -35,14 +35,13 @@ class FollowController(
      * @return 생성된 팔로우 관계
      */
     @PostMapping("/{followingId}")
-    @ResponseStatus(HttpStatus.CREATED)
     fun follow(
         @RequestAttribute userId: UUID,
         @PathVariable followingId: UUID
-    ): Mono<FollowResponse> {
+    ): Mono<ResponseEntity<FollowResponse>> {
         return Mono.fromCallable {
             val follow = followService.follow(userId, followingId)
-            FollowResponse.from(follow)
+            ResponseEntity.status(HttpStatus.CREATED).body(FollowResponse.from(follow))
         }
     }
 
@@ -53,14 +52,13 @@ class FollowController(
      * @param followingId 언팔로우할 사용자 ID
      */
     @DeleteMapping("/{followingId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     fun unfollow(
         @RequestAttribute userId: UUID,
         @PathVariable followingId: UUID
-    ): Mono<Void> {
-        return Mono.fromRunnable {
+    ): Mono<ResponseEntity<Void>> {
+        return Mono.fromRunnable<Void> {
             followService.unfollow(userId, followingId)
-        }
+        }.then(Mono.just(ResponseEntity.noContent().build<Void>()))
     }
 
     /**
@@ -74,10 +72,10 @@ class FollowController(
     fun checkFollowing(
         @RequestAttribute userId: UUID,
         @PathVariable followingId: UUID
-    ): Mono<FollowCheckResponse> {
+    ): Mono<ResponseEntity<FollowCheckResponse>> {
         return Mono.fromCallable {
             val isFollowing = followService.isFollowing(userId, followingId)
-            FollowCheckResponse(userId, followingId, isFollowing)
+            ResponseEntity.ok(FollowCheckResponse(userId, followingId, isFollowing))
         }
     }
 
@@ -90,11 +88,11 @@ class FollowController(
     @GetMapping("/stats/{targetUserId}")
     fun getFollowStats(
         @PathVariable targetUserId: UUID
-    ): Mono<FollowStatsResponse> {
+    ): Mono<ResponseEntity<FollowStatsResponse>> {
         return Mono.fromCallable {
             val followerCount = followService.getFollowerCount(targetUserId)
             val followingCount = followService.getFollowingCount(targetUserId)
-            FollowStatsResponse(targetUserId, followerCount, followingCount)
+            ResponseEntity.ok(FollowStatsResponse(targetUserId, followerCount, followingCount))
         }
     }
 
@@ -107,11 +105,11 @@ class FollowController(
     @GetMapping("/stats/me")
     fun getMyFollowStats(
         @RequestAttribute userId: UUID
-    ): Mono<FollowStatsResponse> {
+    ): Mono<ResponseEntity<FollowStatsResponse>> {
         return Mono.fromCallable {
             val followerCount = followService.getFollowerCount(userId)
             val followingCount = followService.getFollowingCount(userId)
-            FollowStatsResponse(userId, followerCount, followingCount)
+            ResponseEntity.ok(FollowStatsResponse(userId, followerCount, followingCount))
         }
     }
 }
