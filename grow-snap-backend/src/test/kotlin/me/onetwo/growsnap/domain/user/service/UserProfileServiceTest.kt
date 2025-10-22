@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.service
 
+import java.util.UUID
+
 import io.mockk.every
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
@@ -38,8 +40,10 @@ class UserProfileServiceTest {
         userService = mockk()
         userProfileService = UserProfileService(userProfileRepository, userService)
 
+        val testUserId = UUID.randomUUID()
+
         testUser = User(
-            id = 1L,
+            id = testUserId,
             email = "test@example.com",
             provider = OAuthProvider.GOOGLE,
             providerId = "google-123",
@@ -48,7 +52,7 @@ class UserProfileServiceTest {
 
         testProfile = UserProfile(
             id = 1L,
-            userId = 1L,
+            userId = testUserId,
             nickname = "testnick",
             profileImageUrl = "https://example.com/profile.jpg",
             bio = "테스트 자기소개"
@@ -59,7 +63,7 @@ class UserProfileServiceTest {
     @DisplayName("프로필 생성 성공")
     fun createProfile_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val nickname = "newnick"
 
         every { userService.getUserById(userId) } returns testUser
@@ -80,7 +84,7 @@ class UserProfileServiceTest {
     @DisplayName("프로필 생성 실패 - 중복 닉네임")
     fun createProfile_DuplicateNickname_ThrowsException() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val nickname = "duplicatenick"
 
         every { userService.getUserById(userId) } returns testUser
@@ -101,7 +105,7 @@ class UserProfileServiceTest {
     @DisplayName("사용자 ID로 프로필 조회 성공")
     fun getProfileByUserId_ExistingProfile_ReturnsProfile() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
 
         every { userProfileRepository.findByUserId(userId) } returns testProfile
 
@@ -117,7 +121,7 @@ class UserProfileServiceTest {
     @DisplayName("사용자 ID로 프로필 조회 실패")
     fun getProfileByUserId_NonExistingProfile_ThrowsException() {
         // Given
-        val userId = 999L
+        val userId = UUID.randomUUID()
 
         every { userProfileRepository.findByUserId(userId) } returns null
 
@@ -199,7 +203,7 @@ class UserProfileServiceTest {
     @DisplayName("프로필 업데이트 - 닉네임 변경 성공")
     fun updateProfile_ChangeNickname_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val newNickname = "newnick"
 
         val updatedProfile = testProfile.copy(nickname = newNickname)
@@ -222,7 +226,7 @@ class UserProfileServiceTest {
     @DisplayName("프로필 업데이트 - 닉네임 중복으로 실패")
     fun updateProfile_DuplicateNickname_ThrowsException() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val newNickname = "duplicatenick"
 
         every { userProfileRepository.findByUserId(userId) } returns testProfile
@@ -243,7 +247,7 @@ class UserProfileServiceTest {
     @DisplayName("프로필 업데이트 - 같은 닉네임으로 변경 시 중복 검사 안 함")
     fun updateProfile_SameNickname_DoesNotCheckDuplicate() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val sameNickname = testProfile.nickname
 
         every { userProfileRepository.findByUserId(userId) } returns testProfile
@@ -263,7 +267,7 @@ class UserProfileServiceTest {
     @DisplayName("팔로워 수 증가")
     fun incrementFollowerCount_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val updatedProfile = testProfile.copy(followerCount = testProfile.followerCount + 1)
 
         every { userProfileRepository.findByUserId(userId) } returns testProfile
@@ -282,7 +286,7 @@ class UserProfileServiceTest {
     @DisplayName("팔로워 수 감소")
     fun decrementFollowerCount_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val profileWithFollowers = testProfile.copy(followerCount = 5)
         val updatedProfile = profileWithFollowers.copy(followerCount = 4)
 
@@ -302,7 +306,7 @@ class UserProfileServiceTest {
     @DisplayName("팔로워 수 감소 - 0 이하로 내려가지 않음")
     fun decrementFollowerCount_DoesNotGoBelowZero() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val profileWithZeroFollowers = testProfile.copy(followerCount = 0)
 
         every { userProfileRepository.findByUserId(userId) } returns profileWithZeroFollowers
@@ -321,7 +325,7 @@ class UserProfileServiceTest {
     @DisplayName("팔로잉 수 증가")
     fun incrementFollowingCount_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val updatedProfile = testProfile.copy(followingCount = testProfile.followingCount + 1)
 
         every { userProfileRepository.findByUserId(userId) } returns testProfile
@@ -340,7 +344,7 @@ class UserProfileServiceTest {
     @DisplayName("팔로잉 수 감소")
     fun decrementFollowingCount_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val profileWithFollowing = testProfile.copy(followingCount = 3)
         val updatedProfile = profileWithFollowing.copy(followingCount = 2)
 
@@ -360,7 +364,7 @@ class UserProfileServiceTest {
     @DisplayName("팔로잉 수 감소 - 0 이하로 내려가지 않음")
     fun decrementFollowingCount_DoesNotGoBelowZero() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val profileWithZeroFollowing = testProfile.copy(followingCount = 0)
 
         every { userProfileRepository.findByUserId(userId) } returns profileWithZeroFollowing

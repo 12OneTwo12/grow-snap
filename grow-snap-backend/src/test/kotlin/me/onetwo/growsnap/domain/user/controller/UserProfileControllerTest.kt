@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.controller
 
+import java.util.UUID
+
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.verify
@@ -40,7 +42,7 @@ class UserProfileControllerTest {
     @MockkBean
     private lateinit var userProfileService: UserProfileService
 
-    private val testUserId = 1L
+    private val testUserId = UUID.randomUUID()
     private val testProfile = UserProfile(
         id = 1L,
         userId = testUserId,
@@ -169,7 +171,7 @@ class UserProfileControllerTest {
     @DisplayName("사용자 ID로 프로필 조회 성공")
     fun getProfileByUserId_Success() {
         // Given
-        val targetUserId = 2L
+        val targetUserId = UUID.randomUUID()
         every { userProfileService.getProfileByUserId(targetUserId) } returns testProfile
 
         // When & Then
@@ -184,7 +186,7 @@ class UserProfileControllerTest {
                     "profile-get-by-userid",
                     preprocessResponse(prettyPrint()),
                     pathParameters(
-                        parameterWithName("targetUserId").description("조회할 사용자 ID")
+                        parameterWithName("targetUserId").description("조회할 사용자 ID (UUID)")
                     ),
                     responseFields(
                         fieldWithPath("id").description("프로필 ID"),
@@ -241,12 +243,13 @@ class UserProfileControllerTest {
     @DisplayName("프로필 조회 실패 - 프로필 없음")
     fun getProfile_NotFound() {
         // Given
-        every { userProfileService.getProfileByUserId(999L) } throws
+        val nonExistentId = UUID.randomUUID()
+        every { userProfileService.getProfileByUserId(nonExistentId) } throws
                 UserProfileNotFoundException("프로필을 찾을 수 없습니다.")
 
         // When & Then
         webTestClient.get()
-            .uri("/api/v1/profiles/{targetUserId}", 999L)
+            .uri("/api/v1/profiles/{targetUserId}", nonExistentId)
             .exchange()
             .expectStatus().is5xxServerError
     }

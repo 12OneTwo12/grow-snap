@@ -1,5 +1,6 @@
 package me.onetwo.growsnap.domain.user.repository
 
+import java.util.UUID
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserRole
@@ -39,8 +40,7 @@ class UserRepositoryTest {
             email = "test@example.com",
             provider = OAuthProvider.GOOGLE,
             providerId = "google-12345",
-            role = UserRole.USER,
-            isCreator = false
+            role = UserRole.USER
         )
     }
 
@@ -56,7 +56,6 @@ class UserRepositoryTest {
         assertEquals(testUser.provider, savedUser.provider)
         assertEquals(testUser.providerId, savedUser.providerId)
         assertEquals(testUser.role, savedUser.role)
-        assertEquals(testUser.isCreator, savedUser.isCreator)
     }
 
     @Test
@@ -134,48 +133,10 @@ class UserRepositoryTest {
     @DisplayName("ID로 사용자 조회 - 존재하지 않는 경우")
     fun findById_NonExistingUser_ReturnsNull() {
         // When
-        val foundUser = userRepository.findById(999999L)
+        val foundUser = userRepository.findById(UUID.randomUUID())
 
         // Then
         assertNull(foundUser)
-    }
-
-    @Test
-    @DisplayName("사용자 업데이트 성공 - 역할 변경")
-    fun update_ChangeRole_Success() {
-        // Given
-        val savedUser = userRepository.save(testUser)
-        val updatedUser = savedUser.copy(role = UserRole.CREATOR, isCreator = true)
-
-        // When
-        val result = userRepository.update(updatedUser)
-
-        // Then
-        assertEquals(UserRole.CREATOR, result.role)
-        assertEquals(true, result.isCreator)
-
-        // 실제 DB에서 확인
-        val foundUser = userRepository.findById(savedUser.id!!)
-        assertEquals(UserRole.CREATOR, foundUser?.role)
-        assertEquals(true, foundUser?.isCreator)
-    }
-
-    @Test
-    @DisplayName("사용자 업데이트 성공 - 크리에이터 전환")
-    fun update_BecomeCreator_Success() {
-        // Given
-        val savedUser = userRepository.save(testUser)
-        val updatedUser = savedUser.copy(isCreator = true)
-
-        // When
-        val result = userRepository.update(updatedUser)
-
-        // Then
-        assertEquals(true, result.isCreator)
-
-        // 실제 DB에서 확인
-        val foundUser = userRepository.findById(savedUser.id!!)
-        assertEquals(true, foundUser?.isCreator)
     }
 
     @Test

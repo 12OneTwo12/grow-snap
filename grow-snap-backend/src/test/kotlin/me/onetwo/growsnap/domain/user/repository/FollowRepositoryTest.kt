@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.repository
 
+import java.util.UUID
+
 import me.onetwo.growsnap.domain.user.model.Follow
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User

@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.controller
 
+import java.util.UUID
+
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.justRun
@@ -39,8 +41,8 @@ class FollowControllerTest {
     @MockkBean
     private lateinit var followService: FollowService
 
-    private val testUserId = 1L
-    private val testFollowingId = 2L
+    private val testUserId = UUID.randomUUID()
+    private val testFollowingId = UUID.randomUUID()
 
     @Test
     @DisplayName("팔로우 성공")
@@ -61,14 +63,14 @@ class FollowControllerTest {
             .exchange()
             .expectStatus().isCreated
             .expectBody()
-            .jsonPath("$.followerId").isEqualTo(testUserId)
-            .jsonPath("$.followingId").isEqualTo(testFollowingId)
+            .jsonPath("$.followerId").isEqualTo(testUserId.toString())
+            .jsonPath("$.followingId").isEqualTo(testFollowingId.toString())
             .consumeWith(
                 document(
                     "follow-create",
                     preprocessResponse(prettyPrint()),
                     pathParameters(
-                        parameterWithName("followingId").description("팔로우할 사용자 ID")
+                        parameterWithName("followingId").description("팔로우할 사용자 ID (UUID)")
                     ),
                     responseFields(
                         fieldWithPath("id").description("팔로우 관계 ID"),
@@ -129,7 +131,7 @@ class FollowControllerTest {
                 document(
                     "follow-delete",
                     pathParameters(
-                        parameterWithName("followingId").description("언팔로우할 사용자 ID")
+                        parameterWithName("followingId").description("언팔로우할 사용자 ID (UUID)")
                     )
                 )
             )
@@ -166,15 +168,15 @@ class FollowControllerTest {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.followerId").isEqualTo(testUserId)
-            .jsonPath("$.followingId").isEqualTo(testFollowingId)
+            .jsonPath("$.followerId").isEqualTo(testUserId.toString())
+            .jsonPath("$.followingId").isEqualTo(testFollowingId.toString())
             .jsonPath("$.isFollowing").isEqualTo(true)
             .consumeWith(
                 document(
                     "follow-check",
                     preprocessResponse(prettyPrint()),
                     pathParameters(
-                        parameterWithName("followingId").description("확인할 사용자 ID")
+                        parameterWithName("followingId").description("확인할 사용자 ID (UUID)")
                     ),
                     responseFields(
                         fieldWithPath("followerId").description("팔로우하는 사용자 ID"),
@@ -205,7 +207,7 @@ class FollowControllerTest {
     @DisplayName("팔로우 통계 조회 - 특정 사용자")
     fun getFollowStats_Success() {
         // Given
-        val targetUserId = 3L
+        val targetUserId = UUID.randomUUID()
         every { followService.getFollowerCount(targetUserId) } returns 100
         every { followService.getFollowingCount(targetUserId) } returns 50
 
@@ -215,7 +217,7 @@ class FollowControllerTest {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.userId").isEqualTo(targetUserId)
+            .jsonPath("$.userId").isEqualTo(targetUserId.toString())
             .jsonPath("$.followerCount").isEqualTo(100)
             .jsonPath("$.followingCount").isEqualTo(50)
             .consumeWith(
@@ -223,7 +225,7 @@ class FollowControllerTest {
                     "follow-stats-get",
                     preprocessResponse(prettyPrint()),
                     pathParameters(
-                        parameterWithName("targetUserId").description("조회할 사용자 ID")
+                        parameterWithName("targetUserId").description("조회할 사용자 ID (UUID)")
                     ),
                     responseFields(
                         fieldWithPath("userId").description("사용자 ID"),
@@ -248,7 +250,7 @@ class FollowControllerTest {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.userId").isEqualTo(testUserId)
+            .jsonPath("$.userId").isEqualTo(testUserId.toString())
             .jsonPath("$.followerCount").isEqualTo(25)
             .jsonPath("$.followingCount").isEqualTo(30)
             .consumeWith(

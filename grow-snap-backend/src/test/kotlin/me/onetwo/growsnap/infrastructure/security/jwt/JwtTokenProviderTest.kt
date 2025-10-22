@@ -34,7 +34,7 @@ class JwtTokenProviderTest {
     @DisplayName("Access Token 생성 성공")
     fun generateAccessToken_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "test@example.com"
         val role = UserRole.USER
 
@@ -51,7 +51,7 @@ class JwtTokenProviderTest {
     @DisplayName("Refresh Token 생성 성공")
     fun generateRefreshToken_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
 
         // When
         val token = jwtTokenProvider.generateRefreshToken(userId)
@@ -66,7 +66,7 @@ class JwtTokenProviderTest {
     @DisplayName("토큰에서 사용자 ID 추출 성공")
     fun getUserIdFromToken_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "test@example.com"
         val role = UserRole.USER
         val token = jwtTokenProvider.generateAccessToken(userId, email, role)
@@ -82,7 +82,7 @@ class JwtTokenProviderTest {
     @DisplayName("토큰에서 이메일 추출 성공")
     fun getEmailFromToken_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "test@example.com"
         val role = UserRole.USER
         val token = jwtTokenProvider.generateAccessToken(userId, email, role)
@@ -98,9 +98,9 @@ class JwtTokenProviderTest {
     @DisplayName("토큰에서 역할 추출 성공")
     fun getRoleFromToken_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "test@example.com"
-        val role = UserRole.CREATOR
+        val role = UserRole.ADMIN
         val token = jwtTokenProvider.generateAccessToken(userId, email, role)
 
         // When
@@ -114,7 +114,7 @@ class JwtTokenProviderTest {
     @DisplayName("유효한 토큰 검증 성공")
     fun validateToken_ValidToken_ReturnsTrue() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "test@example.com"
         val role = UserRole.USER
         val token = jwtTokenProvider.generateAccessToken(userId, email, role)
@@ -143,7 +143,7 @@ class JwtTokenProviderTest {
     @DisplayName("만료 시간 가져오기 성공")
     fun getExpirationFromToken_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "test@example.com"
         val role = UserRole.USER
         val token = jwtTokenProvider.generateAccessToken(userId, email, role)
@@ -166,7 +166,7 @@ class JwtTokenProviderTest {
             refreshTokenExpiration = 1209600000
         )
         val expiredJwtTokenProvider = JwtTokenProvider(expiredJwtProperties)
-        val token = expiredJwtTokenProvider.generateAccessToken(1L, "test@example.com", UserRole.USER)
+        val token = expiredJwtTokenProvider.generateAccessToken(UUID.randomUUID(), "test@example.com", UserRole.USER)
 
         // When & Then
         assertThrows<JwtException> {
@@ -191,16 +191,12 @@ class JwtTokenProviderTest {
     @DisplayName("다른 사용자 역할로 토큰 생성 및 검증")
     fun generateAccessToken_DifferentRoles_Success() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val email = "admin@example.com"
 
         // When & Then - USER
         val userToken = jwtTokenProvider.generateAccessToken(userId, email, UserRole.USER)
         assertEquals(UserRole.USER, jwtTokenProvider.getRoleFromToken(userToken))
-
-        // When & Then - CREATOR
-        val creatorToken = jwtTokenProvider.generateAccessToken(userId, email, UserRole.CREATOR)
-        assertEquals(UserRole.CREATOR, jwtTokenProvider.getRoleFromToken(creatorToken))
 
         // When & Then - ADMIN
         val adminToken = jwtTokenProvider.generateAccessToken(userId, email, UserRole.ADMIN)

@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.repository
 
+import java.util.UUID
+
 import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserProfile
@@ -87,7 +89,7 @@ class UserProfileRepositoryTest {
     @DisplayName("사용자 ID로 프로필 조회 - 존재하지 않는 경우")
     fun findByUserId_NonExistingProfile_ReturnsNull() {
         // When
-        val foundProfile = userProfileRepository.findByUserId(999999L)
+        val foundProfile = userProfileRepository.findByUserId(UUID.randomUUID())
 
         // Then
         assertNull(foundProfile)

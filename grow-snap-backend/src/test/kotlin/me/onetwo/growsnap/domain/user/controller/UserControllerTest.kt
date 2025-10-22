@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.controller
 
+import java.util.UUID
+
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
 import io.mockk.verify
@@ -38,14 +40,13 @@ class UserControllerTest {
     @MockkBean
     private lateinit var userService: UserService
 
-    private val testUserId = 1L
+    private val testUserId = UUID.randomUUID()
     private val testUser = User(
         id = testUserId,
         email = "test@example.com",
         provider = OAuthProvider.GOOGLE,
         providerId = "google-123",
-        role = UserRole.USER,
-        isCreator = false
+        role = UserRole.USER
     )
 
     @Test
@@ -61,21 +62,19 @@ class UserControllerTest {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.id").isEqualTo(testUserId)
+            .jsonPath("$.id").isEqualTo(testUserId.toString())
             .jsonPath("$.email").isEqualTo("test@example.com")
             .jsonPath("$.provider").isEqualTo("GOOGLE")
             .jsonPath("$.role").isEqualTo("USER")
-            .jsonPath("$.isCreator").isEqualTo(false)
             .consumeWith(
                 document(
                     "user-get-me",
                     preprocessResponse(prettyPrint()),
                     responseFields(
-                        fieldWithPath("id").description("사용자 ID"),
+                        fieldWithPath("id").description("사용자 ID (UUID)"),
                         fieldWithPath("email").description("이메일"),
                         fieldWithPath("provider").description("OAuth 제공자 (GOOGLE, NAVER, KAKAO)"),
-                        fieldWithPath("role").description("사용자 역할 (USER, CREATOR, ADMIN)"),
-                        fieldWithPath("isCreator").description("크리에이터 여부"),
+                        fieldWithPath("role").description("사용자 역할 (USER, ADMIN)"),
                         fieldWithPath("createdAt").description("가입일시"),
                         fieldWithPath("updatedAt").description("수정일시")
                     )
@@ -89,7 +88,7 @@ class UserControllerTest {
     @DisplayName("사용자 ID로 조회 성공")
     fun getUserById_Success() {
         // Given
-        val targetUserId = 2L
+        val targetUserId = UUID.randomUUID()
         val targetUser = testUser.copy(id = targetUserId, email = "target@example.com")
         every { userService.getUserById(targetUserId) } returns targetUser
 
@@ -99,21 +98,20 @@ class UserControllerTest {
             .exchange()
             .expectStatus().isOk
             .expectBody()
-            .jsonPath("$.id").isEqualTo(targetUserId)
+            .jsonPath("$.id").isEqualTo(targetUserId.toString())
             .jsonPath("$.email").isEqualTo("target@example.com")
             .consumeWith(
                 document(
                     "user-get-by-id",
                     preprocessResponse(prettyPrint()),
                     pathParameters(
-                        parameterWithName("targetUserId").description("조회할 사용자 ID")
+                        parameterWithName("targetUserId").description("조회할 사용자 ID (UUID)")
                     ),
                     responseFields(
-                        fieldWithPath("id").description("사용자 ID"),
+                        fieldWithPath("id").description("사용자 ID (UUID)"),
                         fieldWithPath("email").description("이메일"),
                         fieldWithPath("provider").description("OAuth 제공자"),
-                        fieldWithPath("role").description("사용자 역할"),
-                        fieldWithPath("isCreator").description("크리에이터 여부"),
+                        fieldWithPath("role").description("사용자 역할 (USER, ADMIN)"),
                         fieldWithPath("createdAt").description("가입일시"),
                         fieldWithPath("updatedAt").description("수정일시")
                     )
@@ -125,12 +123,13 @@ class UserControllerTest {
     @DisplayName("사용자 조회 실패 - 사용자 없음")
     fun getUserById_NotFound() {
         // Given
-        every { userService.getUserById(999L) } throws
+        val nonExistentId = UUID.randomUUID()
+        every { userService.getUserById(nonExistentId) } throws
                 UserNotFoundException("사용자를 찾을 수 없습니다.")
 
         // When & Then
         webTestClient.get()
-            .uri("/api/v1/users/{targetUserId}", 999L)
+            .uri("/api/v1/users/{targetUserId}", nonExistentId)
             .exchange()
             .expectStatus().is5xxServerError
     }

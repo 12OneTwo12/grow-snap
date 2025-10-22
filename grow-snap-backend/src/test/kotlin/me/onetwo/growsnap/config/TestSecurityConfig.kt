@@ -1,5 +1,6 @@
 package me.onetwo.growsnap.config
 
+import java.util.UUID
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
@@ -37,9 +38,9 @@ class TestSecurityConfig {
         return WebFilter { exchange: ServerWebExchange, chain: WebFilterChain ->
             exchange.request.headers.getFirst("X-User-Id")?.let { userIdHeader ->
                 try {
-                    val userId = userIdHeader.toLong()
+                    val userId = UUID.fromString(userIdHeader)
                     exchange.attributes["userId"] = userId
-                } catch (e: NumberFormatException) {
+                } catch (e: IllegalArgumentException) {
                     // Ignore invalid userId
                 }
             }

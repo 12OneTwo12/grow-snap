@@ -1,5 +1,7 @@
 package me.onetwo.growsnap.domain.user.service
 
+import java.util.UUID
+
 import io.mockk.every
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
@@ -41,7 +43,7 @@ class UserServiceTest {
         val providerId = "google-123"
 
         val existingUser = User(
-            id = 1L,
+            id = UUID.randomUUID(),
             email = email,
             provider = provider,
             providerId = providerId,
@@ -72,12 +74,11 @@ class UserServiceTest {
         val providerId = "google-456"
 
         val newUser = User(
-            id = 2L,
+            id = UUID.randomUUID(),
             email = email,
             provider = provider,
             providerId = providerId,
-            role = UserRole.USER,
-            isCreator = false
+            role = UserRole.USER
         )
 
         every {
@@ -101,7 +102,7 @@ class UserServiceTest {
     @DisplayName("사용자 ID로 조회 성공")
     fun getUserById_ExistingUser_ReturnsUser() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val user = User(
             id = userId,
             email = "test@example.com",
@@ -124,7 +125,7 @@ class UserServiceTest {
     @DisplayName("사용자 ID로 조회 실패 - UserNotFoundException 발생")
     fun getUserById_NonExistingUser_ThrowsException() {
         // Given
-        val userId = 999L
+        val userId = UUID.randomUUID()
 
         every { userRepository.findById(userId) } returns null
 
@@ -143,7 +144,7 @@ class UserServiceTest {
         // Given
         val email = "test@example.com"
         val user = User(
-            id = 1L,
+            id = UUID.randomUUID(),
             email = email,
             provider = OAuthProvider.GOOGLE,
             providerId = "google-123",
@@ -183,7 +184,7 @@ class UserServiceTest {
         // Given
         val email = "existing@example.com"
         val user = User(
-            id = 1L,
+            id = UUID.randomUUID(),
             email = email,
             provider = OAuthProvider.GOOGLE,
             providerId = "google-123",
@@ -214,55 +215,5 @@ class UserServiceTest {
         // Then
         assertFalse(result)
         verify(exactly = 1) { userRepository.findByEmail(email) }
-    }
-
-    @Test
-    @DisplayName("사용자 정보 업데이트 성공")
-    fun updateUser_ExistingUser_UpdatesUser() {
-        // Given
-        val userId = 1L
-        val user = User(
-            id = userId,
-            email = "test@example.com",
-            provider = OAuthProvider.GOOGLE,
-            providerId = "google-123",
-            role = UserRole.CREATOR,
-            isCreator = true
-        )
-
-        every { userRepository.findById(userId) } returns user
-        every { userRepository.update(user) } returns user
-
-        // When
-        val result = userService.updateUser(user)
-
-        // Then
-        assertEquals(user, result)
-        verify(exactly = 1) { userRepository.findById(userId) }
-        verify(exactly = 1) { userRepository.update(user) }
-    }
-
-    @Test
-    @DisplayName("사용자 정보 업데이트 실패 - 사용자 없음")
-    fun updateUser_NonExistingUser_ThrowsException() {
-        // Given
-        val userId = 999L
-        val user = User(
-            id = userId,
-            email = "test@example.com",
-            provider = OAuthProvider.GOOGLE,
-            providerId = "google-123",
-            role = UserRole.USER
-        )
-
-        every { userRepository.findById(userId) } returns null
-
-        // When & Then
-        assertThrows<UserNotFoundException> {
-            userService.updateUser(user)
-        }
-
-        verify(exactly = 1) { userRepository.findById(userId) }
-        verify(exactly = 0) { userRepository.update(any()) }
     }
 }

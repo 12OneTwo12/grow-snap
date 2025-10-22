@@ -1,5 +1,6 @@
 package me.onetwo.growsnap.domain.user.service
 
+import java.util.UUID
 import io.mockk.every
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
@@ -45,7 +46,7 @@ class FollowServiceTest {
         followService = FollowService(followRepository, userService, userProfileService)
 
         followerUser = User(
-            id = 1L,
+            id = UUID.randomUUID(),
             email = "follower@example.com",
             provider = OAuthProvider.GOOGLE,
             providerId = "follower-123",
@@ -53,7 +54,7 @@ class FollowServiceTest {
         )
 
         followingUser = User(
-            id = 2L,
+            id = UUID.randomUUID(),
             email = "following@example.com",
             provider = OAuthProvider.GOOGLE,
             providerId = "following-456",
@@ -62,14 +63,14 @@ class FollowServiceTest {
 
         followerProfile = UserProfile(
             id = 1L,
-            userId = 1L,
+            userId = UUID.randomUUID(),
             nickname = "follower",
             followingCount = 0
         )
 
         followingProfile = UserProfile(
-            id = 2L,
-            userId = 2L,
+            id = 1L,
+            userId = UUID.randomUUID(),
             nickname = "following",
             followerCount = 0
         )
@@ -79,8 +80,8 @@ class FollowServiceTest {
     @DisplayName("팔로우 성공")
     fun follow_Success() {
         // Given
-        val followerId = 1L
-        val followingId = 2L
+        val followerId = UUID.randomUUID()
+        val followingId = UUID.randomUUID()
 
         val follow = Follow(
             id = 1L,
@@ -118,7 +119,7 @@ class FollowServiceTest {
     @DisplayName("팔로우 실패 - 자기 자신 팔로우")
     fun follow_SelfFollow_ThrowsException() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
 
         // When & Then
         assertThrows<CannotFollowSelfException> {
@@ -133,8 +134,8 @@ class FollowServiceTest {
     @DisplayName("팔로우 실패 - 이미 팔로우 중")
     fun follow_AlreadyFollowing_ThrowsException() {
         // Given
-        val followerId = 1L
-        val followingId = 2L
+        val followerId = UUID.randomUUID()
+        val followingId = UUID.randomUUID()
 
         every { userService.getUserById(followerId) } returns followerUser
         every { userService.getUserById(followingId) } returns followingUser
@@ -160,8 +161,8 @@ class FollowServiceTest {
     @DisplayName("언팔로우 성공")
     fun unfollow_Success() {
         // Given
-        val followerId = 1L
-        val followingId = 2L
+        val followerId = UUID.randomUUID()
+        val followingId = UUID.randomUUID()
 
         every { userService.getUserById(followerId) } returns followerUser
         every { userService.getUserById(followingId) } returns followingUser
@@ -192,8 +193,8 @@ class FollowServiceTest {
     @DisplayName("언팔로우 실패 - 팔로우하지 않음")
     fun unfollow_NotFollowing_ThrowsException() {
         // Given
-        val followerId = 1L
-        val followingId = 2L
+        val followerId = UUID.randomUUID()
+        val followingId = UUID.randomUUID()
 
         every { userService.getUserById(followerId) } returns followerUser
         every { userService.getUserById(followingId) } returns followingUser
@@ -219,8 +220,8 @@ class FollowServiceTest {
     @DisplayName("팔로우 관계 확인 - 팔로우 중")
     fun isFollowing_Following_ReturnsTrue() {
         // Given
-        val followerId = 1L
-        val followingId = 2L
+        val followerId = UUID.randomUUID()
+        val followingId = UUID.randomUUID()
 
         every {
             followRepository.existsByFollowerIdAndFollowingId(followerId, followingId)
@@ -240,8 +241,8 @@ class FollowServiceTest {
     @DisplayName("팔로우 관계 확인 - 팔로우하지 않음")
     fun isFollowing_NotFollowing_ReturnsFalse() {
         // Given
-        val followerId = 1L
-        val followingId = 2L
+        val followerId = UUID.randomUUID()
+        val followingId = UUID.randomUUID()
 
         every {
             followRepository.existsByFollowerIdAndFollowingId(followerId, followingId)
@@ -261,7 +262,7 @@ class FollowServiceTest {
     @DisplayName("팔로잉 수 조회")
     fun getFollowingCount_ReturnsCount() {
         // Given
-        val userId = 1L
+        val userId = UUID.randomUUID()
         val count = 5
 
         every { followRepository.countByFollowerId(userId) } returns count
@@ -278,7 +279,7 @@ class FollowServiceTest {
     @DisplayName("팔로워 수 조회")
     fun getFollowerCount_ReturnsCount() {
         // Given
-        val userId = 2L
+        val userId = UUID.randomUUID()
         val count = 10
 
         every { followRepository.countByFollowingId(userId) } returns count
