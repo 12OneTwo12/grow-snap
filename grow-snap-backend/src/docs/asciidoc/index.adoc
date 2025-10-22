@@ -24,6 +24,13 @@ http://localhost:8080
 대부분의 API는 JWT 토큰 기반 인증이 필요합니다.
 요청 헤더에 `Authorization: Bearer {token}` 형식으로 전달해야 합니다.
 
+인증 방법:
+
+1. **OAuth2 소셜 로그인**: Google 계정으로 로그인
+2. **JWT 토큰**: Access Token (1시간) + Refresh Token (14일)
+
+자세한 내용은 <<auth-api,인증 API>> 섹션을 참고하세요.
+
 테스트 환경에서는 `X-User-Id` 헤더를 사용합니다.
 
 === HTTP Status Codes
@@ -58,6 +65,8 @@ http://localhost:8080
 | `500 Internal Server Error`
 | 서버 오류
 |===
+
+include::auth.adoc[]
 
 [[user-api]]
 == User API
