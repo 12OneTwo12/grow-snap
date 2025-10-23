@@ -81,6 +81,66 @@ class ContentInteractionRepositoryImpl(
     }
 
     /**
+     * 좋아요 수 감소
+     *
+     * like_count를 1 감소시키고, updated_at을 갱신합니다.
+     * 0 미만으로 내려가지 않도록 보장합니다.
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 업데이트 완료 신호
+     */
+    override fun decrementLikeCount(contentId: UUID): Mono<Void> {
+        return decrementCount(contentId, CONTENT_INTERACTIONS.LIKE_COUNT)
+    }
+
+    /**
+     * 저장 수 감소
+     *
+     * save_count를 1 감소시키고, updated_at을 갱신합니다.
+     * 0 미만으로 내려가지 않도록 보장합니다.
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 업데이트 완료 신호
+     */
+    override fun decrementSaveCount(contentId: UUID): Mono<Void> {
+        return decrementCount(contentId, CONTENT_INTERACTIONS.SAVE_COUNT)
+    }
+
+    /**
+     * 좋아요 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 좋아요 수
+     */
+    override fun getLikeCount(contentId: UUID): Mono<Int> {
+        return Mono.fromCallable {
+            dslContext
+                .select(CONTENT_INTERACTIONS.LIKE_COUNT)
+                .from(CONTENT_INTERACTIONS)
+                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
+                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
+                .fetchOne(CONTENT_INTERACTIONS.LIKE_COUNT) ?: 0
+        }
+    }
+
+    /**
+     * 저장 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 저장 수
+     */
+    override fun getSaveCount(contentId: UUID): Mono<Int> {
+        return Mono.fromCallable {
+            dslContext
+                .select(CONTENT_INTERACTIONS.SAVE_COUNT)
+                .from(CONTENT_INTERACTIONS)
+                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
+                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
+                .fetchOne(CONTENT_INTERACTIONS.SAVE_COUNT) ?: 0
+        }
+    }
+
+    /**
      * 카운터 증가 공통 로직
      *
      * 지정된 필드를 1 증가시키고, updated_at을 갱신합니다.
@@ -93,6 +153,29 @@ class ContentInteractionRepositoryImpl(
         return Mono.fromCallable {
             dslContext.update(CONTENT_INTERACTIONS)
                 .set(field, field.plus(1))
+                .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
+                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
+                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
+                .execute()
+        }.then()
+    }
+
+    /**
+     * 카운터 감소 공통 로직
+     *
+     * 지정된 필드를 1 감소시키고, updated_at을 갱신합니다.
+     * 0 미만으로 내려가지 않도록 보장합니다.
+     *
+     * @param contentId 콘텐츠 ID
+     * @param field 감소시킬 필드
+     * @return 업데이트 완료 신호
+     */
+    private fun decrementCount(contentId: UUID, field: org.jooq.Field<Int?>): Mono<Void> {
+        return Mono.fromCallable {
+            dslContext.update(CONTENT_INTERACTIONS)
+                .set(field, org.jooq.impl.DSL.case_()
+                    .`when`(field.greaterThan(0), field.minus(1))
+                    .otherwise(0))
                 .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
                 .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
                 .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)

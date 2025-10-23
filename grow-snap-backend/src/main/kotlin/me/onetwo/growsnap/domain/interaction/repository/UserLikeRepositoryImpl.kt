@@ -1,0 +1,160 @@
+package me.onetwo.growsnap.domain.interaction.repository
+
+import me.onetwo.growsnap.domain.interaction.model.UserLike
+import me.onetwo.growsnap.jooq.generated.tables.UserLikes.Companion.USER_LIKES
+import org.jooq.DSLContext
+import org.springframework.stereotype.Repository
+import reactor.core.publisher.Mono
+import java.time.LocalDateTime
+import java.util.UUID
+
+/**
+ * 사용자 좋아요 레포지토리 구현체
+ *
+ * JOOQ를 사용하여 user_likes 테이블에 접근합니다.
+ *
+ * @property dslContext JOOQ DSLContext
+ */
+@Repository
+class UserLikeRepositoryImpl(
+    private val dslContext: DSLContext
+) : UserLikeRepository {
+
+    /**
+     * 좋아요 생성
+     *
+     * ### 처리 흐름
+     * 1. user_likes 테이블에 INSERT
+     * 2. created_at, created_by, updated_at, updated_by 자동 설정
+     *
+     * ### 비즈니스 규칙
+     * - UNIQUE 제약조건 (user_id, content_id)으로 중복 방지
+     * - 이미 좋아요가 있으면 DuplicateKeyException 발생
+     *
+     * @param userId 사용자 ID
+     * @param contentId 콘텐츠 ID
+     * @return 생성된 좋아요
+     */
+    override fun save(userId: UUID, contentId: UUID): Mono<UserLike> {
+        return Mono.fromCallable {
+            val now = LocalDateTime.now()
+
+            dslContext
+                .insertInto(USER_LIKES)
+                .set(USER_LIKES.USER_ID, userId.toString())
+                .set(USER_LIKES.CONTENT_ID, contentId.toString())
+                .set(USER_LIKES.CREATED_AT, now)
+                .set(USER_LIKES.CREATED_BY, userId.toString())
+                .set(USER_LIKES.UPDATED_AT, now)
+                .set(USER_LIKES.UPDATED_BY, userId.toString())
+                .returning()
+                .fetchOne()
+                ?.let {
+                    UserLike(
+                        id = it.getValue(USER_LIKES.ID),
+                        userId = UUID.fromString(it.getValue(USER_LIKES.USER_ID)),
+                        contentId = UUID.fromString(it.getValue(USER_LIKES.CONTENT_ID)),
+                        createdAt = it.getValue(USER_LIKES.CREATED_AT)!!,
+                        createdBy = it.getValue(USER_LIKES.CREATED_BY)?.let { UUID.fromString(it) },
+                        updatedAt = it.getValue(USER_LIKES.UPDATED_AT)!!,
+                        updatedBy = it.getValue(USER_LIKES.UPDATED_BY)?.let { UUID.fromString(it) },
+                        deletedAt = it.getValue(USER_LIKES.DELETED_AT)
+                    )
+                } ?: throw IllegalStateException("Failed to create user like")
+        }
+    }
+
+    /**
+     * 좋아요 삭제 (Soft Delete)
+     *
+     * ### 처리 흐름
+     * 1. user_likes 테이블에서 deleted_at 업데이트
+     * 2. updated_at, updated_by 갱신
+     *
+     * ### 비즈니스 규칙
+     * - 물리적 삭제 금지, 논리적 삭제만 허용
+     * - 이미 삭제된 데이터는 제외 (deleted_at IS NULL 조건)
+     *
+     * @param userId 사용자 ID
+     * @param contentId 콘텐츠 ID
+     * @return 처리 완료 신호
+     */
+    override fun delete(userId: UUID, contentId: UUID): Mono<Void> {
+        return Mono.fromCallable {
+            val now = LocalDateTime.now()
+
+            dslContext
+                .update(USER_LIKES)
+                .set(USER_LIKES.DELETED_AT, now)
+                .set(USER_LIKES.UPDATED_AT, now)
+                .set(USER_LIKES.UPDATED_BY, userId.toString())
+                .where(USER_LIKES.USER_ID.eq(userId.toString()))
+                .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
+                .and(USER_LIKES.DELETED_AT.isNull)
+                .execute()
+        }.then()
+    }
+
+    /**
+     * 좋아요 존재 여부 확인
+     *
+     * deleted_at이 NULL인 레코드만 확인합니다.
+     *
+     * @param userId 사용자 ID
+     * @param contentId 콘텐츠 ID
+     * @return 좋아요 여부
+     */
+    override fun exists(userId: UUID, contentId: UUID): Mono<Boolean> {
+        return Mono.fromCallable {
+            dslContext
+                .selectCount()
+                .from(USER_LIKES)
+                .where(USER_LIKES.USER_ID.eq(userId.toString()))
+                .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
+                .and(USER_LIKES.DELETED_AT.isNull)
+                .fetchOne(0, Int::class.java) ?: 0 > 0
+        }
+    }
+
+    /**
+     * 사용자의 좋아요 조회
+     *
+     * deleted_at이 NULL인 레코드만 조회합니다.
+     *
+     * @param userId 사용자 ID
+     * @param contentId 콘텐츠 ID
+     * @return 좋아요 (없으면 empty)
+     */
+    override fun findByUserIdAndContentId(userId: UUID, contentId: UUID): Mono<UserLike> {
+        return Mono.fromCallable {
+            dslContext
+                .select(
+                    USER_LIKES.ID,
+                    USER_LIKES.USER_ID,
+                    USER_LIKES.CONTENT_ID,
+                    USER_LIKES.CREATED_AT,
+                    USER_LIKES.CREATED_BY,
+                    USER_LIKES.UPDATED_AT,
+                    USER_LIKES.UPDATED_BY,
+                    USER_LIKES.DELETED_AT
+                )
+                .from(USER_LIKES)
+                .where(USER_LIKES.USER_ID.eq(userId.toString()))
+                .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
+                .and(USER_LIKES.DELETED_AT.isNull)
+                .fetchOne()
+                ?.let {
+                    UserLike(
+                        id = it.getValue(USER_LIKES.ID),
+                        userId = UUID.fromString(it.getValue(USER_LIKES.USER_ID)),
+                        contentId = UUID.fromString(it.getValue(USER_LIKES.CONTENT_ID)),
+                        createdAt = it.getValue(USER_LIKES.CREATED_AT)!!,
+                        createdBy = it.getValue(USER_LIKES.CREATED_BY)?.let { UUID.fromString(it) },
+                        updatedAt = it.getValue(USER_LIKES.UPDATED_AT)!!,
+                        updatedBy = it.getValue(USER_LIKES.UPDATED_BY)?.let { UUID.fromString(it) },
+                        deletedAt = it.getValue(USER_LIKES.DELETED_AT)
+                    )
+                }
+        }.flatMap { Mono.justOrEmpty(it) }
+    }
+}

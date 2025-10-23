@@ -81,8 +81,13 @@ TikTok, 인스타그램 숏츠처럼 재미있지만, 스크롤하다 보면 어
        - ✅ 신규 콘텐츠 (10%): 최신 업로드 순
        - ✅ 랜덤 콘텐츠 (20%): 다양성 확보
        - ✅ 협업 필터링 (40%): 현재는 인기 콘텐츠로 대체 (Phase 2 예정)
+   - ✅ **소셜 인터랙션** 🆕
+     - ✅ 좋아요 기능 (POST/DELETE /api/v1/videos/{videoId}/like)
+     - ✅ 공유 기능 (POST /api/v1/videos/{videoId}/share)
+     - ✅ 공유 링크 생성 (GET /api/v1/videos/{videoId}/share-link)
+     - 🔜 댓글 기능 (예정)
+     - 🔜 저장 기능 (예정)
    - 학습 경로
-   - 기본 인터랙션 (좋아요, 댓글, 저장)
 
 2. **크리에이터 도구**
    - 콘텐츠 업로드 시스템
@@ -96,6 +101,13 @@ TikTok, 인스타그램 숏츠처럼 재미있지만, 스크롤하다 보면 어
 ### 스마트 피드 API
 - **`GET /api/v1/feed`** - 메인 피드 조회 (추천 알고리즘 적용)
 - **`GET /api/v1/feed/following`** - 팔로잉 피드 조회
+
+### 소셜 인터랙션 API 🆕
+- **`POST /api/v1/videos/{videoId}/like`** - 좋아요
+- **`DELETE /api/v1/videos/{videoId}/like`** - 좋아요 취소
+- **`GET /api/v1/videos/{videoId}/likes`** - 좋아요 수 조회
+- **`POST /api/v1/videos/{videoId}/share`** - 공유 (카운터 증가)
+- **`GET /api/v1/videos/{videoId}/share-link`** - 공유 링크 생성
 
 #### 구현된 기능
 - **커서 기반 페이지네이션**: 무한 스크롤 지원
