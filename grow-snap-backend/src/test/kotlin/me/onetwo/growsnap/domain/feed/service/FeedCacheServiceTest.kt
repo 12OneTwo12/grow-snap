@@ -228,15 +228,14 @@ class FeedCacheServiceTest {
         @DisplayName("사용자의 모든 배치를 삭제하고 true를 반환한다")
         fun clearUserCache_DeletesAllBatchesAndReturnsTrue() {
             // Given: 사용자의 여러 배치가 있음
-            val pattern = "feed:rec:$userId:batch:*"
             val keys = listOf(
                 "feed:rec:$userId:batch:0",
                 "feed:rec:$userId:batch:1",
                 "feed:rec:$userId:batch:2"
             )
 
-            every { reactiveRedisTemplate.keys(pattern) } returns Flux.fromIterable(keys)
-            every { reactiveRedisTemplate.delete(*keys.toTypedArray()) } returns Mono.just(3L)
+            every { reactiveRedisTemplate.scan(any()) } returns Flux.fromIterable(keys)
+            every { reactiveRedisTemplate.delete(any<Flux<String>>()) } returns Mono.just(3L)
 
             // When: 사용자 캐시 삭제
             val result = feedCacheService.clearUserCache(userId)
@@ -248,16 +247,15 @@ class FeedCacheServiceTest {
                 }
                 .verifyComplete()
 
-            verify(exactly = 1) { reactiveRedisTemplate.keys(pattern) }
-            verify(exactly = 1) { reactiveRedisTemplate.delete(*keys.toTypedArray()) }
+            verify(exactly = 1) { reactiveRedisTemplate.scan(any()) }
+            verify(exactly = 1) { reactiveRedisTemplate.delete(any<Flux<String>>()) }
         }
 
         @Test
         @DisplayName("삭제할 캐시가 없는 경우에도 true를 반환한다")
         fun clearUserCache_WithoutCachedData_ReturnsTrue() {
             // Given: 캐시에 데이터 없음
-            val pattern = "feed:rec:$userId:batch:*"
-            every { reactiveRedisTemplate.keys(pattern) } returns Flux.empty()
+            every { reactiveRedisTemplate.scan(any()) } returns Flux.empty()
 
             // When: 캐시 삭제 시도
             val result = feedCacheService.clearUserCache(userId)
@@ -269,8 +267,8 @@ class FeedCacheServiceTest {
                 }
                 .verifyComplete()
 
-            verify(exactly = 1) { reactiveRedisTemplate.keys(pattern) }
-            verify(exactly = 0) { reactiveRedisTemplate.delete(any<String>()) }
+            verify(exactly = 1) { reactiveRedisTemplate.scan(any()) }
+            verify(exactly = 0) { reactiveRedisTemplate.delete(any<Flux<String>>()) }
         }
 
         @Test
@@ -278,18 +276,17 @@ class FeedCacheServiceTest {
         fun clearUserCache_DoesNotDeleteOtherUsersCache() {
             // Given: user1의 캐시만 있음
             val user1 = UUID.randomUUID()
-            val pattern = "feed:rec:$user1:batch:*"
             val keys = listOf("feed:rec:$user1:batch:0")
 
-            every { reactiveRedisTemplate.keys(pattern) } returns Flux.fromIterable(keys)
-            every { reactiveRedisTemplate.delete(*keys.toTypedArray()) } returns Mono.just(1L)
+            every { reactiveRedisTemplate.scan(any()) } returns Flux.fromIterable(keys)
+            every { reactiveRedisTemplate.delete(any<Flux<String>>()) } returns Mono.just(1L)
 
             // When: user1의 캐시만 삭제
             feedCacheService.clearUserCache(user1).block()
 
-            // Then: user1의 패턴으로만 삭제 호출됨
-            verify(exactly = 1) { reactiveRedisTemplate.keys(pattern) }
-            verify(exactly = 1) { reactiveRedisTemplate.delete(*keys.toTypedArray()) }
+            // Then: scan과 delete 호출 확인
+            verify(exactly = 1) { reactiveRedisTemplate.scan(any()) }
+            verify(exactly = 1) { reactiveRedisTemplate.delete(any<Flux<String>>()) }
         }
     }
 }

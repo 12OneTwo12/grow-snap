@@ -1,6 +1,7 @@
 package me.onetwo.growsnap.domain.feed.service
 
 import org.springframework.data.redis.core.ReactiveRedisTemplate
+import org.springframework.data.redis.core.ScanOptions
 import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
@@ -148,7 +149,7 @@ class FeedCacheService(
      */
     fun clearUserCache(userId: UUID): Mono<Boolean> {
         val pattern = "feed:rec:$userId:batch:*"
-        val scanOptions = org.springframework.data.redis.core.ScanOptions.scanOptions()
+        val scanOptions = ScanOptions.scanOptions()
             .match(pattern)
             .build()
 
@@ -159,7 +160,7 @@ class FeedCacheService(
                     Mono.just(true)
                 } else {
                     // Spread operator 대신 Flux를 사용하여 성능 최적화
-                    redisTemplate.delete(reactor.core.publisher.Flux.fromIterable(keys))
+                    redisTemplate.delete(Flux.fromIterable(keys))
                         .map { it > 0 }
                 }
             }
