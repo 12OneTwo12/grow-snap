@@ -3,7 +3,6 @@ package me.onetwo.growsnap.infrastructure.config
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.data.redis.serializer.StringRedisSerializer
@@ -12,6 +11,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer
  * Redis 설정 클래스
  *
  * Redis 연결 및 RedisTemplate을 설정합니다.
+ * ReactiveRedisTemplate은 Spring Boot의 자동 설정을 사용합니다.
  */
 @Configuration
 class RedisConfig {
@@ -23,25 +23,32 @@ class RedisConfig {
     private var port: Int = 6379
 
     /**
-     * Redis Connection Factory 빈 생성
+     * Lettuce Connection Factory 빈 생성
      *
-     * @return Redis Connection Factory
+     * LettuceConnectionFactory는 RedisConnectionFactory와 ReactiveRedisConnectionFactory를 모두 구현합니다.
+     * 따라서 하나의 빈으로 Non-Reactive와 Reactive 모두 지원합니다.
+     *
+     * @return Lettuce Connection Factory
      */
     @Bean
-    fun redisConnectionFactory(): RedisConnectionFactory {
-        return LettuceConnectionFactory(host, port)
+    fun lettuceConnectionFactory(): LettuceConnectionFactory {
+        val factory = LettuceConnectionFactory(host, port)
+        factory.afterPropertiesSet()
+        return factory
     }
 
     /**
      * RedisTemplate 빈 생성
      *
-     * @param connectionFactory Redis Connection Factory
+     * Non-Reactive Redis 작업을 위한 템플릿입니다.
+     *
+     * @param lettuceConnectionFactory Lettuce Connection Factory
      * @return RedisTemplate<String, String>
      */
     @Bean
-    fun redisTemplate(connectionFactory: RedisConnectionFactory): RedisTemplate<String, String> {
+    fun redisTemplate(lettuceConnectionFactory: LettuceConnectionFactory): RedisTemplate<String, String> {
         val template = RedisTemplate<String, String>()
-        template.connectionFactory = connectionFactory
+        template.connectionFactory = lettuceConnectionFactory
         template.keySerializer = StringRedisSerializer()
         template.valueSerializer = StringRedisSerializer()
         return template

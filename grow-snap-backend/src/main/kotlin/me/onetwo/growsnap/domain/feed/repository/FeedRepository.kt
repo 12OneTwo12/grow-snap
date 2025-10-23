@@ -97,4 +97,15 @@ interface FeedRepository {
      * @return 랜덤 콘텐츠 ID 목록 (무작위 정렬)
      */
     fun findRandomContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID>
+
+    /**
+     * 콘텐츠 ID 목록 기반 상세 정보 조회
+     *
+     * 추천 알고리즘에서 받은 콘텐츠 ID 목록으로 상세 정보를 조회합니다.
+     * ID 목록의 순서를 유지하여 반환합니다.
+     *
+     * @param contentIds 콘텐츠 ID 목록 (순서 유지)
+     * @return 피드 아이템 목록 (입력 순서 유지)
+     */
+    fun findByContentIds(contentIds: List<UUID>): Flux<FeedItemResponse>
 }

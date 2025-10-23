@@ -405,6 +405,76 @@ class FeedRepositoryImpl(
     }
 
     /**
+     * 콘텐츠 ID 목록 기반 상세 정보 조회
+     *
+     * 추천 알고리즘에서 받은 콘텐츠 ID 목록으로 상세 정보를 조회합니다.
+     * ID 목록의 순서를 유지하여 반환합니다.
+     *
+     * @param contentIds 콘텐츠 ID 목록 (순서 유지)
+     * @return 피드 아이템 목록 (입력 순서 유지)
+     */
+    override fun findByContentIds(contentIds: List<UUID>): Flux<FeedItemResponse> {
+        if (contentIds.isEmpty()) {
+            return Flux.empty()
+        }
+
+        return Mono.fromCallable {
+            val records = dslContext
+                .select(
+                    // CONTENTS 필요 컬럼만 명시적으로 선택
+                    CONTENTS.ID,
+                    CONTENTS.CONTENT_TYPE,
+                    CONTENTS.URL,
+                    CONTENTS.THUMBNAIL_URL,
+                    CONTENTS.DURATION,
+                    CONTENTS.WIDTH,
+                    CONTENTS.HEIGHT,
+                    CONTENTS.CREATED_AT,
+                    // CONTENT_METADATA 필요 컬럼만 명시적으로 선택
+                    CONTENT_METADATA.TITLE,
+                    CONTENT_METADATA.DESCRIPTION,
+                    CONTENT_METADATA.CATEGORY,
+                    CONTENT_METADATA.TAGS,
+                    // CONTENT_INTERACTIONS 필요 컬럼만 명시적으로 선택
+                    CONTENT_INTERACTIONS.LIKE_COUNT,
+                    CONTENT_INTERACTIONS.COMMENT_COUNT,
+                    CONTENT_INTERACTIONS.SAVE_COUNT,
+                    CONTENT_INTERACTIONS.SHARE_COUNT,
+                    CONTENT_INTERACTIONS.VIEW_COUNT,
+                    // USERS, USER_PROFILES
+                    USERS.ID,
+                    USER_PROFILES.NICKNAME,
+                    USER_PROFILES.PROFILE_IMAGE_URL,
+                    USER_PROFILES.FOLLOWER_COUNT
+                )
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .join(CONTENT_INTERACTIONS).on(CONTENT_INTERACTIONS.CONTENT_ID.eq(CONTENTS.ID))
+                .join(USERS).on(USERS.ID.eq(CONTENTS.CREATOR_ID))
+                .join(USER_PROFILES).on(USER_PROFILES.USER_ID.eq(USERS.ID))
+                .where(CONTENTS.ID.`in`(contentIds.map { it.toString() }))
+                .and(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+                .and(USERS.DELETED_AT.isNull)
+                .and(USER_PROFILES.DELETED_AT.isNull)
+                .fetch()
+
+            // 자막 배치 조회 (N+1 문제 방지)
+            val subtitlesMap = findSubtitlesByContentIds(contentIds)
+
+            // 레코드를 FeedItemResponse로 변환
+            val feedItemsMap = records
+                .map { record -> mapRecordToFeedItem(record, subtitlesMap) }
+                .associateBy { it.contentId }
+
+            // 입력된 ID 순서대로 정렬하여 반환
+            contentIds.mapNotNull { feedItemsMap[it] }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
      * 여러 콘텐츠의 자막 정보를 배치로 조회 (N+1 문제 방지)
      *
      * @param contentIds 콘텐츠 ID 목록
