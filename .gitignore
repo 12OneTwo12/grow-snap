@@ -28,3 +28,36 @@ replay_pid*
 
 .idea
 .DS_Store
+
+### Backend (Spring Boot + Gradle) ###
+grow-snap-backend/HELP.md
+grow-snap-backend/.gradle
+grow-snap-backend/build/
+grow-snap-backend/out/
+grow-snap-backend/bin/
+!grow-snap-backend/gradle/wrapper/gradle-wrapper.jar
+!grow-snap-backend/**/src/main/**/build/
+!grow-snap-backend/**/src/test/**/build/
+
+### STS ###
+grow-snap-backend/.apt_generated
+grow-snap-backend/.classpath
+grow-snap-backend/.factorypath
+grow-snap-backend/.project
+grow-snap-backend/.settings
+grow-snap-backend/.springBeans
+grow-snap-backend/.sts4-cache
+
+### IntelliJ IDEA ###
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/
+
+### JOOQ Generated Code ###
+grow-snap-backend/src/main/generated/
+
+### REST Docs Generated HTML ###
+grow-snap-backend/src/main/resources/static/docs/

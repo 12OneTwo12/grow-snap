@@ -69,7 +69,7 @@ data class User(
 // ✅ GOOD: 조회 시 삭제된 데이터 제외
 fun findActiveUsers(): List<User> {
     return dslContext
-        .select(USER.asterisk())
+        .select(USER.ID, USER.EMAIL, USER.NAME)  // 필요한 컬럼만 명시
         .from(USER)
         .where(USER.DELETED_AT.isNull)  // ✅ 삭제된 데이터 제외
         .fetchInto(User::class.java)
@@ -1004,7 +1004,12 @@ class VideoRepositoryImpl(
     override fun findById(id: String): Mono<Video> {
         return Mono.fromCallable {
             dslContext
-                .select(VIDEO.asterisk())
+                .select(
+                    VIDEO.ID,
+                    VIDEO.TITLE,
+                    VIDEO.URL,
+                    VIDEO.DURATION
+                )  // ✅ 필요한 컬럼만 명시적으로 선택
                 .from(VIDEO)
                 .where(VIDEO.ID.eq(id))
                 .fetchOneInto(Video::class.java)
@@ -1022,6 +1027,91 @@ class VideoRepositoryImpl(
     }
 }
 ```
+
+### Database Query 작성 규칙 (JOOQ)
+
+**⚠️ 중요**: SELECT 쿼리에서 asterisk (*) 사용 절대 금지
+
+#### ❌ 잘못된 예시
+
+```kotlin
+// ❌ BAD: asterisk 사용
+dslContext
+    .select(CONTENTS.asterisk())
+    .from(CONTENTS)
+    .fetch()
+
+// ❌ BAD: 여러 테이블에 asterisk 사용
+dslContext
+    .select(
+        CONTENTS.asterisk(),
+        CONTENT_METADATA.asterisk(),
+        CONTENT_INTERACTIONS.asterisk()
+    )
+    .from(CONTENTS)
+    .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+    .fetch()
+```
+
+**문제점**:
+1. **성능 저하**: 불필요한 컬럼까지 모두 조회하여 DB 및 네트워크 부하 증가
+2. **대역폭 낭비**: 사용하지 않는 데이터까지 전송
+3. **유지보수 어려움**: 어떤 컬럼을 실제로 사용하는지 코드만 보고 파악 불가
+4. **스키마 변경에 취약**: 테이블 컬럼 추가/삭제 시 예상치 못한 오류 발생 가능
+
+#### ✅ 올바른 예시
+
+```kotlin
+// ✅ GOOD: 필요한 컬럼만 명시적으로 선택
+dslContext
+    .select(
+        CONTENTS.ID,
+        CONTENTS.CONTENT_TYPE,
+        CONTENTS.URL,
+        CONTENTS.THUMBNAIL_URL,
+        CONTENTS.DURATION,
+        CONTENTS.WIDTH,
+        CONTENTS.HEIGHT
+    )
+    .from(CONTENTS)
+    .fetch()
+
+// ✅ GOOD: 조인 쿼리에서도 필요한 컬럼만 명시
+dslContext
+    .select(
+        // CONTENTS 필요 컬럼
+        CONTENTS.ID,
+        CONTENTS.CONTENT_TYPE,
+        CONTENTS.URL,
+        CONTENTS.THUMBNAIL_URL,
+        // CONTENT_METADATA 필요 컬럼
+        CONTENT_METADATA.TITLE,
+        CONTENT_METADATA.DESCRIPTION,
+        CONTENT_METADATA.CATEGORY,
+        // CONTENT_INTERACTIONS 필요 컬럼
+        CONTENT_INTERACTIONS.LIKE_COUNT,
+        CONTENT_INTERACTIONS.VIEW_COUNT
+    )
+    .from(CONTENTS)
+    .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+    .join(CONTENT_INTERACTIONS).on(CONTENT_INTERACTIONS.CONTENT_ID.eq(CONTENTS.ID))
+    .fetch()
+```
+
+**장점**:
+1. ✅ **성능 최적화**: 필요한 데이터만 조회하여 DB 부하 감소
+2. ✅ **명확성**: 코드만 보고 어떤 데이터를 사용하는지 즉시 파악 가능
+3. ✅ **안정성**: 스키마 변경 시 영향받는 범위를 명확히 알 수 있음
+4. ✅ **대역폭 절약**: 네트워크 트래픽 최소화
+
+#### 📋 Database Query 체크리스트
+
+코드 작성 전 반드시 확인:
+
+- [ ] **asterisk 사용 금지**: `.select(TABLE.asterisk())` 사용하지 않았는가?
+- [ ] **명시적 컬럼 선택**: 실제 사용하는 컬럼만 명시적으로 선택했는가?
+- [ ] **주석 추가**: 조인이 복잡한 경우, 각 테이블의 컬럼 그룹에 주석을 추가했는가?
+- [ ] **불필요한 컬럼 제거**: 조회하지만 사용하지 않는 컬럼은 없는가?
 
 ### 예외 처리
 
@@ -1088,6 +1178,7 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 10. **성능 vs 가독성**: 가독성 우선, 필요시 최적화
 11. **RESTful API**: 동사 금지, 적절한 HTTP 메서드/상태 코드
 12. **Audit Trail**: 모든 엔티티에 5가지 필드 필수 (createdAt, createdBy, updatedAt, updatedBy, deletedAt), 물리적 삭제 금지
+13. **Database Query**: SELECT 쿼리에서 asterisk (*) 사용 절대 금지, 필요한 컬럼만 명시적으로 선택
 
 ---
 
