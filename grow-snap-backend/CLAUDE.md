@@ -590,6 +590,246 @@ class VideoServiceImplTest {
 }
 ```
 
+### Repository 테스트 템플릿
+
+**중요**: Repository는 반드시 **통합 테스트 (Integration Test)** 로 작성합니다.
+
+**Why Integration Test?**
+- Repository는 실제 데이터베이스와 상호작용하는 계층
+- 단위 테스트로는 JOOQ 쿼리, SQL 문법, 데이터베이스 제약조건을 검증할 수 없음
+- H2 In-Memory DB를 사용하여 실제 데이터베이스 동작을 검증
+- 트랜잭션 격리, Soft Delete, Audit Trail 등 데이터베이스 레벨 기능 검증 필요
+
+```kotlin
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+@DisplayName("콘텐츠 인터랙션 Repository 통합 테스트")
+class ContentInteractionRepositoryTest {
+
+    @Autowired
+    private lateinit var contentInteractionRepository: ContentInteractionRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var dslContext: DSLContext
+
+    private lateinit var testUser: User
+    private lateinit var testContentId: UUID
+
+    @BeforeEach
+    fun setUp() {
+        // Given: 테스트 데이터 준비
+
+        // 사용자 생성
+        testUser = userRepository.save(
+            User(
+                email = "creator@test.com",
+                provider = OAuthProvider.GOOGLE,
+                providerId = "creator-123",
+                role = UserRole.USER
+            )
+        )
+
+        // 콘텐츠 생성
+        testContentId = UUID.randomUUID()
+        insertContent(testContentId, testUser.id!!, "Test Video")
+    }
+
+    @Nested
+    @DisplayName("incrementViewCount - 조회수 증가")
+    inner class IncrementViewCount {
+
+        @Test
+        @DisplayName("조회수를 1 증가시킨다")
+        fun incrementViewCount_IncreasesCountByOne() {
+            // Given: 초기 조회수 확인
+            val initialCount = getViewCount(testContentId)
+
+            // When: 조회수 증가
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+
+            // Then: 1 증가 확인
+            val updatedCount = getViewCount(testContentId)
+            assertEquals(initialCount + 1, updatedCount)
+        }
+
+        @Test
+        @DisplayName("여러 번 증가 시, 누적된다")
+        fun incrementViewCount_MultipleTimes_Accumulates() {
+            // Given: 초기 조회수 확인
+            val initialCount = getViewCount(testContentId)
+
+            // When: 3번 증가
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+
+            // Then: 3 증가 확인
+            val updatedCount = getViewCount(testContentId)
+            assertEquals(initialCount + 3, updatedCount)
+        }
+
+        @Test
+        @DisplayName("삭제된 콘텐츠는 업데이트되지 않는다")
+        fun incrementViewCount_DeletedContent_DoesNotUpdate() {
+            // Given: 콘텐츠 삭제 (Soft Delete)
+            dslContext.update(CONTENT_INTERACTIONS)
+                .set(CONTENT_INTERACTIONS.DELETED_AT, LocalDateTime.now())
+                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(testContentId.toString()))
+                .execute()
+
+            val initialCount = getViewCount(testContentId)
+
+            // When: 조회수 증가 시도
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+
+            // Then: 변경 없음
+            val updatedCount = getViewCount(testContentId)
+            assertEquals(initialCount, updatedCount)
+        }
+    }
+
+    /**
+     * 콘텐츠 삽입 헬퍼 메서드
+     */
+    private fun insertContent(
+        contentId: UUID,
+        creatorId: UUID,
+        title: String
+    ) {
+        val now = LocalDateTime.now()
+
+        // Contents 테이블
+        dslContext.insertInto(CONTENTS)
+            .set(CONTENTS.ID, contentId.toString())
+            .set(CONTENTS.CREATOR_ID, creatorId.toString())
+            .set(CONTENTS.CONTENT_TYPE, ContentType.VIDEO.name)
+            .set(CONTENTS.URL, "https://example.com/$contentId.mp4")
+            .set(CONTENTS.THUMBNAIL_URL, "https://example.com/$contentId-thumb.jpg")
+            .set(CONTENTS.DURATION, 60)
+            .set(CONTENTS.WIDTH, 1920)
+            .set(CONTENTS.HEIGHT, 1080)
+            .set(CONTENTS.STATUS, ContentStatus.PUBLISHED.name)
+            .set(CONTENTS.CREATED_AT, now)
+            .set(CONTENTS.CREATED_BY, creatorId.toString())
+            .set(CONTENTS.UPDATED_AT, now)
+            .set(CONTENTS.UPDATED_BY, creatorId.toString())
+            .execute()
+
+        // Content_Metadata 테이블
+        dslContext.insertInto(CONTENT_METADATA)
+            .set(CONTENT_METADATA.CONTENT_ID, contentId.toString())
+            .set(CONTENT_METADATA.TITLE, title)
+            .set(CONTENT_METADATA.DESCRIPTION, "Test Description")
+            .set(CONTENT_METADATA.CATEGORY, Category.PROGRAMMING.name)
+            .set(CONTENT_METADATA.TAGS, JSON.valueOf("[\"test\"]"))
+            .set(CONTENT_METADATA.LANGUAGE, "ko")
+            .set(CONTENT_METADATA.CREATED_AT, now)
+            .set(CONTENT_METADATA.CREATED_BY, creatorId.toString())
+            .set(CONTENT_METADATA.UPDATED_AT, now)
+            .set(CONTENT_METADATA.UPDATED_BY, creatorId.toString())
+            .execute()
+
+        // Content_Interactions 테이블 (초기값 0)
+        dslContext.insertInto(CONTENT_INTERACTIONS)
+            .set(CONTENT_INTERACTIONS.CONTENT_ID, contentId.toString())
+            .set(CONTENT_INTERACTIONS.VIEW_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.LIKE_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.COMMENT_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.SAVE_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.SHARE_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.CREATED_AT, now)
+            .set(CONTENT_INTERACTIONS.CREATED_BY, creatorId.toString())
+            .set(CONTENT_INTERACTIONS.UPDATED_AT, now)
+            .set(CONTENT_INTERACTIONS.UPDATED_BY, creatorId.toString())
+            .execute()
+    }
+
+    /**
+     * 조회수 조회 헬퍼 메서드
+     */
+    private fun getViewCount(contentId: UUID): Int {
+        return dslContext.select(CONTENT_INTERACTIONS.VIEW_COUNT)
+            .from(CONTENT_INTERACTIONS)
+            .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
+            .fetchOne(CONTENT_INTERACTIONS.VIEW_COUNT) ?: 0
+    }
+}
+```
+
+#### Repository 테스트 핵심 원칙
+
+**1. 통합 테스트 필수 (Integration Test Required)**
+```kotlin
+@SpringBootTest          // ✅ Spring 컨텍스트 로드 (H2 DB 포함)
+@ActiveProfiles("test")  // ✅ application-test.yml 사용
+@Transactional           // ✅ 각 테스트 후 자동 롤백 (테스트 격리)
+```
+
+**2. 실제 데이터베이스 검증**
+- DSLContext를 사용하여 실제 데이터베이스 상태 확인
+- JOOQ 쿼리가 올바르게 실행되는지 검증
+- Soft Delete, Audit Trail 등 데이터베이스 레벨 패턴 검증
+
+**3. 헬퍼 메서드 활용**
+```kotlin
+// ✅ 테스트 데이터 삽입 헬퍼 메서드
+private fun insertContent(contentId: UUID, creatorId: UUID, title: String) { /* ... */ }
+
+// ✅ 데이터베이스 상태 확인 헬퍼 메서드
+private fun getViewCount(contentId: UUID): Int { /* ... */ }
+```
+
+**4. Given-When-Then 패턴**
+```kotlin
+// Given: 테스트 데이터 준비 (BeforeEach 또는 테스트 메서드 내)
+val initialCount = getViewCount(testContentId)
+
+// When: Repository 메서드 실행
+contentInteractionRepository.incrementViewCount(testContentId).block()
+
+// Then: 데이터베이스 상태 검증
+val updatedCount = getViewCount(testContentId)
+assertEquals(initialCount + 1, updatedCount)
+```
+
+**5. Reactive 타입 처리**
+```kotlin
+// ✅ Mono/Flux는 .block() 또는 StepVerifier로 테스트
+repository.save(entity).block()
+
+// ✅ Flux는 .collectList().block()으로 변환
+val results = repository.findAll().collectList().block()!!
+assertEquals(3, results.size)
+```
+
+#### Repository 테스트 체크리스트
+
+**모든 Repository는 반드시 다음을 테스트해야 합니다:**
+
+- [ ] **CRUD 기본 동작**: save, findById, update, delete
+- [ ] **조회 조건**: where 절, 정렬, 페이징, limit
+- [ ] **Soft Delete**: deleted_at이 null인 데이터만 조회되는지 검증
+- [ ] **Audit Trail**: created_at, created_by, updated_at, updated_by 자동 설정 검증
+- [ ] **엣지 케이스**: 데이터 없을 때, 중복 데이터, null 값 처리
+- [ ] **트랜잭션 격리**: 각 테스트가 독립적으로 실행되는지 확인 (@Transactional)
+
+---
+
+### ⚠️ 테스트 작성 필수 계층
+
+**모든 기능 구현 시, 다음 3가지 계층의 테스트를 반드시 작성합니다:**
+
+1. **Controller 테스트** - HTTP 요청/응답, Validation, REST Docs
+2. **Service 테스트** - 비즈니스 로직, 예외 처리, 트랜잭션
+3. **Repository 테스트** - 데이터베이스 CRUD, 쿼리, Soft Delete, Audit Trail
+
+**❌ Controller + Service 테스트만 작성하고 Repository 테스트를 생략하지 마세요!**
+**✅ Repository 테스트가 없으면 데이터베이스 레벨의 버그를 놓칠 수 있습니다!**
+
 ---
 
 ## 📝 KDoc 작성 규칙

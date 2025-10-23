@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS user_content_interactions (
     deleted_at TIMESTAMP NULL,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
-    CONSTRAINT unique_user_content_interaction UNIQUE (user_id, content_id, interaction_type, deleted_at)
+    CONSTRAINT unique_user_content_interaction UNIQUE (user_id, content_id, interaction_type)
 );
 
 CREATE INDEX idx_user_interaction_user_id ON user_content_interactions(user_id);
