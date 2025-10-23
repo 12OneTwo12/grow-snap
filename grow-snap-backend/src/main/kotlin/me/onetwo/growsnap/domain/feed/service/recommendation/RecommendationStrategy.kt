@@ -38,7 +38,7 @@ enum class RecommendationStrategy(val percentage: Double, val description: Strin
          * 전체 비율 합이 100%인지 검증
          */
         init {
-            val totalPercentage = values().sumOf { it.percentage }
+            val totalPercentage = RecommendationStrategy.entries.toTypedArray().sumOf { it.percentage }
             require(totalPercentage == 1.0) {
                 "Total percentage must be 1.0, but got $totalPercentage"
             }
@@ -55,7 +55,7 @@ enum class RecommendationStrategy(val percentage: Double, val description: Strin
             var remaining = totalLimit
 
             // COLLABORATIVE, POPULAR, NEW는 비율대로 계산
-            values().dropLast(1).forEach { strategy ->
+            RecommendationStrategy.entries.dropLast(1).forEach { strategy ->
                 val limit = (totalLimit * strategy.percentage).toInt()
                 limits[strategy] = limit
                 remaining -= limit
