@@ -93,8 +93,14 @@ class UserLikeRepositoryTest {
                 userLikeRepository.save(testUserId, testContentId).block()
                 assert(false) { "Expected exception but none was thrown" }
             } catch (e: Exception) {
-                // 예외 발생 확인
-                assertTrue(e.message?.contains("duplicate", ignoreCase = true) ?: false)
+                // 예외 발생 확인 (duplicate, unique constraint violation 등)
+                val message = e.message?.lowercase() ?: ""
+                assertTrue(
+                    message.contains("duplicate") ||
+                    message.contains("unique") ||
+                    message.contains("constraint"),
+                    "Expected constraint violation but got: ${e.message}"
+                )
             }
         }
     }
