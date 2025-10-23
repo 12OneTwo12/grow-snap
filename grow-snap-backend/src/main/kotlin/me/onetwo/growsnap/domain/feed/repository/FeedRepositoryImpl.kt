@@ -8,7 +8,7 @@ import me.onetwo.growsnap.domain.feed.dto.CreatorInfoResponse
 import me.onetwo.growsnap.domain.feed.dto.FeedItemResponse
 import me.onetwo.growsnap.domain.feed.dto.InteractionInfoResponse
 import me.onetwo.growsnap.domain.feed.dto.SubtitleInfoResponse
-import me.onetwo.growsnap.jooq.generated.Tables.*
+import me.onetwo.growsnap.jooq.generated.tables.references.*
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
@@ -106,28 +106,28 @@ class FeedRepositoryImpl(
 
                     FeedItemResponse(
                         contentId = contentId,
-                        contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)),
-                        url = record.get(CONTENTS.URL),
-                        thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL),
+                        contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)!!),
+                        url = record.get(CONTENTS.URL)!!,
+                        thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL)!!,
                         duration = record.get(CONTENTS.DURATION),
-                        width = record.get(CONTENTS.WIDTH),
-                        height = record.get(CONTENTS.HEIGHT),
-                        title = record.get(CONTENT_METADATA.TITLE),
+                        width = record.get(CONTENTS.WIDTH)!!,
+                        height = record.get(CONTENTS.HEIGHT)!!,
+                        title = record.get(CONTENT_METADATA.TITLE)!!,
                         description = record.get(CONTENT_METADATA.DESCRIPTION),
-                        category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)),
+                        category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)!!),
                         tags = tags,
                         creator = CreatorInfoResponse(
-                            userId = UUID.fromString(record.get(USERS.ID)),
-                            nickname = record.get(USER_PROFILES.NICKNAME),
+                            userId = UUID.fromString(record.get(USERS.ID)!!),
+                            nickname = record.get(USER_PROFILES.NICKNAME)!!,
                             profileImageUrl = record.get(USER_PROFILES.PROFILE_IMAGE_URL),
-                            followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)
+                            followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)!!
                         ),
                         interactions = InteractionInfoResponse(
-                            likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT),
-                            commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT),
-                            saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT),
-                            shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT),
-                            viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)
+                            likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT)!!,
+                            commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT)!!,
+                            saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT)!!,
+                            shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT)!!,
+                            viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)!!
                         ),
                         subtitles = subtitles
                     )
@@ -205,28 +205,28 @@ class FeedRepositoryImpl(
 
                     FeedItemResponse(
                         contentId = contentId,
-                        contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)),
-                        url = record.get(CONTENTS.URL),
-                        thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL),
+                        contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)!!),
+                        url = record.get(CONTENTS.URL)!!,
+                        thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL)!!,
                         duration = record.get(CONTENTS.DURATION),
-                        width = record.get(CONTENTS.WIDTH),
-                        height = record.get(CONTENTS.HEIGHT),
-                        title = record.get(CONTENT_METADATA.TITLE),
+                        width = record.get(CONTENTS.WIDTH)!!,
+                        height = record.get(CONTENTS.HEIGHT)!!,
+                        title = record.get(CONTENT_METADATA.TITLE)!!,
                         description = record.get(CONTENT_METADATA.DESCRIPTION),
-                        category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)),
+                        category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)!!),
                         tags = tags,
                         creator = CreatorInfoResponse(
-                            userId = UUID.fromString(record.get(USERS.ID)),
-                            nickname = record.get(USER_PROFILES.NICKNAME),
+                            userId = UUID.fromString(record.get(USERS.ID)!!),
+                            nickname = record.get(USER_PROFILES.NICKNAME)!!,
                             profileImageUrl = record.get(USER_PROFILES.PROFILE_IMAGE_URL),
-                            followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)
+                            followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)!!
                         ),
                         interactions = InteractionInfoResponse(
-                            likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT),
-                            commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT),
-                            saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT),
-                            shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT),
-                            viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)
+                            likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT)!!,
+                            commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT)!!,
+                            saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT)!!,
+                            shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT)!!,
+                            viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)!!
                         ),
                         subtitles = subtitles
                     )
@@ -274,8 +274,8 @@ class FeedRepositoryImpl(
             .fetch()
             .map { record ->
                 SubtitleInfoResponse(
-                    language = record.get(CONTENT_SUBTITLES.LANGUAGE),
-                    subtitleUrl = record.get(CONTENT_SUBTITLES.SUBTITLE_URL)
+                    language = record.get(CONTENT_SUBTITLES.LANGUAGE)!!,
+                    subtitleUrl = record.get(CONTENT_SUBTITLES.SUBTITLE_URL)!!
                 )
             }
     }

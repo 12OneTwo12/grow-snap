@@ -2,6 +2,7 @@ package me.onetwo.growsnap.domain.feed.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import io.mockk.every
+import me.onetwo.growsnap.config.TestSecurityConfig
 import me.onetwo.growsnap.domain.content.model.Category
 import me.onetwo.growsnap.domain.content.model.ContentType
 import me.onetwo.growsnap.domain.feed.dto.CreatorInfoResponse
@@ -18,18 +19,18 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.restdocs.operation.preprocess.Preprocessors.*
 import org.springframework.restdocs.payload.PayloadDocumentation.*
 import org.springframework.restdocs.request.RequestDocumentation.*
 import org.springframework.restdocs.webtestclient.WebTestClientRestDocumentation.document
-import org.springframework.security.test.context.support.WithMockUser
 import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Mono
 import java.util.UUID
 
 @WebFluxTest(FeedController::class)
-@Import(RestDocsConfiguration::class)
+@Import(RestDocsConfiguration::class, TestSecurityConfig::class)
 @AutoConfigureRestDocs
 @DisplayName("피드 컨트롤러 테스트")
 class FeedControllerTest {
@@ -45,7 +46,6 @@ class FeedControllerTest {
     inner class GetMainFeed {
 
         @Test
-        @WithMockUser(username = "550e8400-e29b-41d4-a716-446655440000")
         @DisplayName("유효한 요청으로 조회 시, 200 OK와 피드 목록을 반환한다")
         fun getMainFeed_WithValidRequest_ReturnsOkAndFeedItems() {
             // Given: 테스트 데이터
@@ -66,6 +66,7 @@ class FeedControllerTest {
                         .queryParam("limit", 10)
                         .build()
                 }
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk
@@ -116,7 +117,6 @@ class FeedControllerTest {
         }
 
         @Test
-        @WithMockUser(username = "550e8400-e29b-41d4-a716-446655440000")
         @DisplayName("커서와 함께 요청 시, 200 OK와 다음 페이지를 반환한다")
         fun getMainFeed_WithCursor_ReturnsOkAndNextPage() {
             // Given: 커서가 있는 요청
@@ -139,6 +139,7 @@ class FeedControllerTest {
                         .queryParam("limit", 10)
                         .build()
                 }
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk
@@ -161,7 +162,6 @@ class FeedControllerTest {
     inner class GetFollowingFeed {
 
         @Test
-        @WithMockUser(username = "550e8400-e29b-41d4-a716-446655440000")
         @DisplayName("유효한 요청으로 조회 시, 200 OK와 팔로잉 피드 목록을 반환한다")
         fun getFollowingFeed_WithValidRequest_ReturnsOkAndFeedItems() {
             // Given: 테스트 데이터
@@ -182,6 +182,7 @@ class FeedControllerTest {
                         .queryParam("limit", 10)
                         .build()
                 }
+                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk
