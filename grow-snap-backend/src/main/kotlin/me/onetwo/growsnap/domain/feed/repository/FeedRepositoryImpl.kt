@@ -8,9 +8,15 @@ import me.onetwo.growsnap.domain.feed.dto.CreatorInfoResponse
 import me.onetwo.growsnap.domain.feed.dto.FeedItemResponse
 import me.onetwo.growsnap.domain.feed.dto.InteractionInfoResponse
 import me.onetwo.growsnap.domain.feed.dto.SubtitleInfoResponse
-import me.onetwo.growsnap.jooq.generated.tables.references.*
+import me.onetwo.growsnap.jooq.generated.tables.references.CONTENTS
+import me.onetwo.growsnap.jooq.generated.tables.references.CONTENT_INTERACTIONS
+import me.onetwo.growsnap.jooq.generated.tables.references.CONTENT_METADATA
+import me.onetwo.growsnap.jooq.generated.tables.references.CONTENT_SUBTITLES
+import me.onetwo.growsnap.jooq.generated.tables.references.FOLLOWS
+import me.onetwo.growsnap.jooq.generated.tables.references.USERS
+import me.onetwo.growsnap.jooq.generated.tables.references.USER_PROFILES
+import me.onetwo.growsnap.jooq.generated.tables.references.USER_VIEW_HISTORY
 import org.jooq.DSLContext
-import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -86,52 +92,19 @@ class FeedRepositoryImpl(
                 ))
             }
 
-            query
+            val records = query
                 .orderBy(CONTENTS.CREATED_AT.desc())
                 .limit(limit)
                 .fetch()
-                .map { record ->
-                    val contentId = UUID.fromString(record.get(CONTENTS.ID))
 
-                    // 태그 파싱
-                    val tagsJson = record.get(CONTENT_METADATA.TAGS)
-                    val tags = if (tagsJson != null) {
-                        objectMapper.readValue<List<String>>(tagsJson.toString())
-                    } else {
-                        emptyList()
-                    }
+            // 모든 콘텐츠 ID 추출
+            val contentIds = records.map { UUID.fromString(it.get(CONTENTS.ID)) }
 
-                    // 자막 조회 (별도 쿼리)
-                    val subtitles = findSubtitlesByContentId(contentId)
+            // 자막 배치 조회 (N+1 문제 방지)
+            val subtitlesMap = findSubtitlesByContentIds(contentIds)
 
-                    FeedItemResponse(
-                        contentId = contentId,
-                        contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)!!),
-                        url = record.get(CONTENTS.URL)!!,
-                        thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL)!!,
-                        duration = record.get(CONTENTS.DURATION),
-                        width = record.get(CONTENTS.WIDTH)!!,
-                        height = record.get(CONTENTS.HEIGHT)!!,
-                        title = record.get(CONTENT_METADATA.TITLE)!!,
-                        description = record.get(CONTENT_METADATA.DESCRIPTION),
-                        category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)!!),
-                        tags = tags,
-                        creator = CreatorInfoResponse(
-                            userId = UUID.fromString(record.get(USERS.ID)!!),
-                            nickname = record.get(USER_PROFILES.NICKNAME)!!,
-                            profileImageUrl = record.get(USER_PROFILES.PROFILE_IMAGE_URL),
-                            followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)!!
-                        ),
-                        interactions = InteractionInfoResponse(
-                            likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT)!!,
-                            commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT)!!,
-                            saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT)!!,
-                            shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT)!!,
-                            viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)!!
-                        ),
-                        subtitles = subtitles
-                    )
-                }
+            // 레코드를 FeedItemResponse로 변환
+            records.map { record -> mapRecordToFeedItem(record, subtitlesMap) }
         }
             .flatMapMany { Flux.fromIterable(it) }
     }
@@ -187,50 +160,19 @@ class FeedRepositoryImpl(
                 ))
             }
 
-            query
+            val records = query
                 .orderBy(CONTENTS.CREATED_AT.desc())
                 .limit(limit)
                 .fetch()
-                .map { record ->
-                    val contentId = UUID.fromString(record.get(CONTENTS.ID))
 
-                    val tagsJson = record.get(CONTENT_METADATA.TAGS)
-                    val tags = if (tagsJson != null) {
-                        objectMapper.readValue<List<String>>(tagsJson.toString())
-                    } else {
-                        emptyList()
-                    }
+            // 모든 콘텐츠 ID 추출
+            val contentIds = records.map { UUID.fromString(it.get(CONTENTS.ID)) }
 
-                    val subtitles = findSubtitlesByContentId(contentId)
+            // 자막 배치 조회 (N+1 문제 방지)
+            val subtitlesMap = findSubtitlesByContentIds(contentIds)
 
-                    FeedItemResponse(
-                        contentId = contentId,
-                        contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)!!),
-                        url = record.get(CONTENTS.URL)!!,
-                        thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL)!!,
-                        duration = record.get(CONTENTS.DURATION),
-                        width = record.get(CONTENTS.WIDTH)!!,
-                        height = record.get(CONTENTS.HEIGHT)!!,
-                        title = record.get(CONTENT_METADATA.TITLE)!!,
-                        description = record.get(CONTENT_METADATA.DESCRIPTION),
-                        category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)!!),
-                        tags = tags,
-                        creator = CreatorInfoResponse(
-                            userId = UUID.fromString(record.get(USERS.ID)!!),
-                            nickname = record.get(USER_PROFILES.NICKNAME)!!,
-                            profileImageUrl = record.get(USER_PROFILES.PROFILE_IMAGE_URL),
-                            followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)!!
-                        ),
-                        interactions = InteractionInfoResponse(
-                            likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT)!!,
-                            commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT)!!,
-                            saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT)!!,
-                            shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT)!!,
-                            viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)!!
-                        ),
-                        subtitles = subtitles
-                    )
-                }
+            // 레코드를 FeedItemResponse로 변환
+            records.map { record -> mapRecordToFeedItem(record, subtitlesMap) }
         }
             .flatMapMany { Flux.fromIterable(it) }
     }
@@ -260,23 +202,87 @@ class FeedRepositoryImpl(
     }
 
     /**
-     * 콘텐츠 ID로 자막 정보 조회 (헬퍼 메서드)
+     * 데이터베이스 레코드를 FeedItemResponse로 변환
      *
-     * @param contentId 콘텐츠 ID
-     * @return 자막 정보 목록
+     * @param record JOOQ 레코드
+     * @param subtitlesMap 콘텐츠 ID를 키로 하는 자막 정보 맵
+     * @return FeedItemResponse
      */
-    private fun findSubtitlesByContentId(contentId: UUID): List<SubtitleInfoResponse> {
+    private fun mapRecordToFeedItem(
+        record: org.jooq.Record,
+        subtitlesMap: Map<UUID, List<SubtitleInfoResponse>>
+    ): FeedItemResponse {
+        val contentId = UUID.fromString(record.get(CONTENTS.ID))
+
+        // 태그 파싱
+        val tagsJson = record.get(CONTENT_METADATA.TAGS)
+        val tags = if (tagsJson != null) {
+            objectMapper.readValue<List<String>>(tagsJson.toString())
+        } else {
+            emptyList()
+        }
+
+        // 자막은 미리 조회한 맵에서 가져오기
+        val subtitles = subtitlesMap[contentId] ?: emptyList()
+
+        return FeedItemResponse(
+            contentId = contentId,
+            contentType = ContentType.valueOf(record.get(CONTENTS.CONTENT_TYPE)!!),
+            url = record.get(CONTENTS.URL)!!,
+            thumbnailUrl = record.get(CONTENTS.THUMBNAIL_URL)!!,
+            duration = record.get(CONTENTS.DURATION),
+            width = record.get(CONTENTS.WIDTH)!!,
+            height = record.get(CONTENTS.HEIGHT)!!,
+            title = record.get(CONTENT_METADATA.TITLE)!!,
+            description = record.get(CONTENT_METADATA.DESCRIPTION),
+            category = Category.valueOf(record.get(CONTENT_METADATA.CATEGORY)!!),
+            tags = tags,
+            creator = CreatorInfoResponse(
+                userId = UUID.fromString(record.get(USERS.ID)!!),
+                nickname = record.get(USER_PROFILES.NICKNAME)!!,
+                profileImageUrl = record.get(USER_PROFILES.PROFILE_IMAGE_URL),
+                followerCount = record.get(USER_PROFILES.FOLLOWER_COUNT)!!
+            ),
+            interactions = InteractionInfoResponse(
+                likeCount = record.get(CONTENT_INTERACTIONS.LIKE_COUNT)!!,
+                commentCount = record.get(CONTENT_INTERACTIONS.COMMENT_COUNT)!!,
+                saveCount = record.get(CONTENT_INTERACTIONS.SAVE_COUNT)!!,
+                shareCount = record.get(CONTENT_INTERACTIONS.SHARE_COUNT)!!,
+                viewCount = record.get(CONTENT_INTERACTIONS.VIEW_COUNT)!!
+            ),
+            subtitles = subtitles
+        )
+    }
+
+    /**
+     * 여러 콘텐츠의 자막 정보를 배치로 조회 (N+1 문제 방지)
+     *
+     * @param contentIds 콘텐츠 ID 목록
+     * @return 콘텐츠 ID를 키로 하는 자막 정보 맵
+     */
+    private fun findSubtitlesByContentIds(contentIds: List<UUID>): Map<UUID, List<SubtitleInfoResponse>> {
+        if (contentIds.isEmpty()) {
+            return emptyMap()
+        }
+
         return dslContext
-            .select(CONTENT_SUBTITLES.LANGUAGE, CONTENT_SUBTITLES.SUBTITLE_URL)
+            .select(
+                CONTENT_SUBTITLES.CONTENT_ID,
+                CONTENT_SUBTITLES.LANGUAGE,
+                CONTENT_SUBTITLES.SUBTITLE_URL
+            )
             .from(CONTENT_SUBTITLES)
-            .where(CONTENT_SUBTITLES.CONTENT_ID.eq(contentId.toString()))
+            .where(CONTENT_SUBTITLES.CONTENT_ID.`in`(contentIds.map { it.toString() }))
             .and(CONTENT_SUBTITLES.DELETED_AT.isNull)
             .fetch()
-            .map { record ->
-                SubtitleInfoResponse(
-                    language = record.get(CONTENT_SUBTITLES.LANGUAGE)!!,
-                    subtitleUrl = record.get(CONTENT_SUBTITLES.SUBTITLE_URL)!!
-                )
-            }
+            .groupBy(
+                { UUID.fromString(it.get(CONTENT_SUBTITLES.CONTENT_ID)) },
+                { record ->
+                    SubtitleInfoResponse(
+                        language = record.get(CONTENT_SUBTITLES.LANGUAGE)!!,
+                        subtitleUrl = record.get(CONTENT_SUBTITLES.SUBTITLE_URL)!!
+                    )
+                }
+            )
     }
 }

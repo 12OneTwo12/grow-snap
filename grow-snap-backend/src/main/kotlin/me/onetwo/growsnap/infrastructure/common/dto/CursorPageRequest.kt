@@ -11,14 +11,22 @@ package me.onetwo.growsnap.infrastructure.common.dto
  */
 data class CursorPageRequest(
     val cursor: String? = null,
-    val limit: Int = 20
+    val limit: Int = DEFAULT_LIMIT
 ) {
     init {
-        require(limit in 1..100) { "Limit must be between 1 and 100" }
+        require(limit in MIN_LIMIT..MAX_LIMIT) {
+            "Limit must be between $MIN_LIMIT and $MAX_LIMIT"
+        }
     }
 
     companion object {
+        /** 페이지당 최소 항목 수 */
+        const val MIN_LIMIT = 1
+
+        /** 페이지당 기본 항목 수 */
         const val DEFAULT_LIMIT = 20
+
+        /** 페이지당 최대 항목 수 */
         const val MAX_LIMIT = 100
     }
 }

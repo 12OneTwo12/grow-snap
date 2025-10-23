@@ -1,9 +1,7 @@
 package me.onetwo.growsnap.domain.feed.service.recommendation
 
-import me.onetwo.growsnap.domain.feed.repository.FeedRepository
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import java.util.UUID
 
 /**
@@ -15,12 +13,10 @@ import java.util.UUID
  * - 신규 콘텐츠 (10%): 최근 업로드
  * - 랜덤 콘텐츠 (20%): 다양성 확보
  *
- * @property feedRepository 피드 레포지토리
+ * See #32: 실제 추천 알고리즘 구현 예정
  */
 @Service
-class RecommendationServiceImpl(
-    private val feedRepository: FeedRepository
-) : RecommendationService {
+class RecommendationServiceImpl : RecommendationService {
 
     /**
      * 추천 콘텐츠 ID 목록 조회
@@ -74,7 +70,7 @@ class RecommendationServiceImpl(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // TODO: 향후 협업 필터링 알고리즘 구현
+        // See #32: 협업 필터링 알고리즘 구현 예정
         // 현재는 인기 콘텐츠로 대체
         return getPopularContentIds(limit, excludeContentIds)
     }
@@ -92,7 +88,7 @@ class RecommendationServiceImpl(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // TODO: Repository 메서드 호출
+        // See #32: 인기 콘텐츠 조회 Repository 메서드 구현 예정
         // return feedRepository.findPopularContentIds(limit, excludeContentIds)
         return Flux.empty()
     }
@@ -110,7 +106,7 @@ class RecommendationServiceImpl(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // TODO: Repository 메서드 호출
+        // See #32: 신규 콘텐츠 조회 Repository 메서드 구현 예정
         // return feedRepository.findNewContentIds(limit, excludeContentIds)
         return Flux.empty()
     }
@@ -128,7 +124,7 @@ class RecommendationServiceImpl(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // TODO: Repository 메서드 호출
+        // See #32: 랜덤 콘텐츠 조회 Repository 메서드 구현 예정
         // return feedRepository.findRandomContentIds(limit, excludeContentIds)
         return Flux.empty()
     }
