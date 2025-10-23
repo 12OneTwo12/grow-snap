@@ -754,7 +754,20 @@ class FeedRepositoryImplTest {
     }
 
     /**
-     * 콘텐츠 + 인터랙션 정보 삽입 헬퍼 메서드
+     * 인터랙션 카운트 데이터 클래스
+     *
+     * Long Parameter List를 해결하기 위한 데이터 클래스
+     */
+    private data class InteractionCounts(
+        val viewCount: Int = 0,
+        val likeCount: Int = 0,
+        val commentCount: Int = 0,
+        val saveCount: Int = 0,
+        val shareCount: Int = 0
+    )
+
+    /**
+     * 콘텐츠 + 인터랙션 정보 삽입 헬퍼 메서드 (오버로드 - 하위 호환성 유지)
      */
     private fun insertContentWithInteractions(
         contentId: UUID,
@@ -765,6 +778,25 @@ class FeedRepositoryImplTest {
         commentCount: Int,
         saveCount: Int,
         shareCount: Int,
+        createdAt: LocalDateTime = LocalDateTime.now()
+    ) {
+        insertContentWithInteractions(
+            contentId,
+            creatorId,
+            title,
+            InteractionCounts(viewCount, likeCount, commentCount, saveCount, shareCount),
+            createdAt
+        )
+    }
+
+    /**
+     * 콘텐츠 + 인터랙션 정보 삽입 헬퍼 메서드 (새 버전 - 파라미터 간소화)
+     */
+    private fun insertContentWithInteractions(
+        contentId: UUID,
+        creatorId: UUID,
+        title: String,
+        interactions: InteractionCounts,
         createdAt: LocalDateTime = LocalDateTime.now()
     ) {
         // Contents 테이블
@@ -801,11 +833,11 @@ class FeedRepositoryImplTest {
         // Content_Interactions 테이블 (커스텀 인터랙션 수)
         dslContext.insertInto(CONTENT_INTERACTIONS)
             .set(CONTENT_INTERACTIONS.CONTENT_ID, contentId.toString())
-            .set(CONTENT_INTERACTIONS.VIEW_COUNT, viewCount)
-            .set(CONTENT_INTERACTIONS.LIKE_COUNT, likeCount)
-            .set(CONTENT_INTERACTIONS.COMMENT_COUNT, commentCount)
-            .set(CONTENT_INTERACTIONS.SAVE_COUNT, saveCount)
-            .set(CONTENT_INTERACTIONS.SHARE_COUNT, shareCount)
+            .set(CONTENT_INTERACTIONS.VIEW_COUNT, interactions.viewCount)
+            .set(CONTENT_INTERACTIONS.LIKE_COUNT, interactions.likeCount)
+            .set(CONTENT_INTERACTIONS.COMMENT_COUNT, interactions.commentCount)
+            .set(CONTENT_INTERACTIONS.SAVE_COUNT, interactions.saveCount)
+            .set(CONTENT_INTERACTIONS.SHARE_COUNT, interactions.shareCount)
             .set(CONTENT_INTERACTIONS.CREATED_AT, createdAt)
             .set(CONTENT_INTERACTIONS.CREATED_BY, creatorId.toString())
             .set(CONTENT_INTERACTIONS.UPDATED_AT, createdAt)

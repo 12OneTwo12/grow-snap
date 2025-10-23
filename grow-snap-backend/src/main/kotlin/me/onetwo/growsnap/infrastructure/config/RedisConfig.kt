@@ -28,13 +28,13 @@ class RedisConfig {
      * LettuceConnectionFactory는 RedisConnectionFactory와 ReactiveRedisConnectionFactory를 모두 구현합니다.
      * 따라서 하나의 빈으로 Non-Reactive와 Reactive 모두 지원합니다.
      *
+     * Spring이 빈 라이프사이클을 관리하므로 afterPropertiesSet()을 수동으로 호출할 필요가 없습니다.
+     *
      * @return Lettuce Connection Factory
      */
     @Bean
     fun lettuceConnectionFactory(): LettuceConnectionFactory {
-        val factory = LettuceConnectionFactory(host, port)
-        factory.afterPropertiesSet()
-        return factory
+        return LettuceConnectionFactory(host, port)
     }
 
     /**

@@ -17,6 +17,7 @@ import me.onetwo.growsnap.jooq.generated.tables.references.USERS
 import me.onetwo.growsnap.jooq.generated.tables.references.USER_PROFILES
 import me.onetwo.growsnap.jooq.generated.tables.references.USER_VIEW_HISTORY
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -308,12 +309,12 @@ class FeedRepositoryImpl(
      */
     override fun findPopularContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
         return Mono.fromCallable {
-            // 인기도 점수 계산식
-            val popularityScore = CONTENT_INTERACTIONS.VIEW_COUNT.cast(Double::class.java)
-                .plus(CONTENT_INTERACTIONS.LIKE_COUNT.mul(5))
-                .plus(CONTENT_INTERACTIONS.COMMENT_COUNT.mul(3))
-                .plus(CONTENT_INTERACTIONS.SAVE_COUNT.mul(7))
-                .plus(CONTENT_INTERACTIONS.SHARE_COUNT.mul(10))
+            // 인기도 점수 계산식 (부동소수점 연산)
+            val popularityScore = CONTENT_INTERACTIONS.VIEW_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_VIEW)
+                .plus(CONTENT_INTERACTIONS.LIKE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_LIKE))
+                .plus(CONTENT_INTERACTIONS.COMMENT_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_COMMENT))
+                .plus(CONTENT_INTERACTIONS.SAVE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_SAVE))
+                .plus(CONTENT_INTERACTIONS.SHARE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_SHARE))
 
             var query = dslContext
                 .select(CONTENTS.ID)
@@ -396,7 +397,7 @@ class FeedRepositoryImpl(
             }
 
             query
-                .orderBy(org.jooq.impl.DSL.rand())
+                .orderBy(DSL.rand())
                 .limit(limit)
                 .fetch()
                 .map { UUID.fromString(it.get(CONTENTS.ID)) }
@@ -504,5 +505,19 @@ class FeedRepositoryImpl(
                     )
                 }
             )
+    }
+
+    companion object {
+        /**
+         * 인기도 점수 계산 가중치
+         *
+         * 각 인터랙션 유형별 가중치를 정의합니다.
+         * 높은 가중치일수록 인기도 점수에 더 큰 영향을 미칩니다.
+         */
+        private const val POPULARITY_WEIGHT_VIEW = 1.0
+        private const val POPULARITY_WEIGHT_LIKE = 5.0
+        private const val POPULARITY_WEIGHT_COMMENT = 3.0
+        private const val POPULARITY_WEIGHT_SAVE = 7.0
+        private const val POPULARITY_WEIGHT_SHARE = 10.0
     }
 }

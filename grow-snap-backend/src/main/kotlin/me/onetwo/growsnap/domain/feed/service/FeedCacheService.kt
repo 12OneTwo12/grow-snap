@@ -1,6 +1,7 @@
 package me.onetwo.growsnap.domain.feed.service
 
 import org.springframework.data.redis.core.ReactiveRedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -52,6 +53,10 @@ class FeedCacheService(
      * 추천 알고리즘 결과를 Redis에 캐싱합니다.
      * TTL은 30분으로 설정됩니다.
      *
+     * Lua 스크립트를 사용하여 RPUSH와 EXPIRE를 원자적으로 실행합니다.
+     * 이를 통해 RPUSH 성공 후 EXPIRE 실패 시 TTL 없이 키가 남아
+     * 메모리 누수가 발생하는 문제를 방지합니다.
+     *
      * @param userId 사용자 ID
      * @param batchNumber 배치 번호
      * @param contentIds 추천 콘텐츠 ID 목록
@@ -68,13 +73,27 @@ class FeedCacheService(
 
         val key = buildBatchKey(userId, batchNumber)
         val values = contentIds.map { it.toString() }
+        val ttlSeconds = batchTtl.seconds
 
-        return redisTemplate.opsForList()
-            .rightPushAll(key, values)
-            .flatMap {
-                // TTL 설정 (30분)
-                redisTemplate.expire(key, BATCH_TTL)
-            }
+        // Lua 스크립트: RPUSH와 EXPIRE를 원자적으로 실행
+        val scriptText = """
+            redis.call('DEL', KEYS[1])
+            for i = 1, #ARGV - 1 do
+                redis.call('RPUSH', KEYS[1], ARGV[i])
+            end
+            redis.call('EXPIRE', KEYS[1], tonumber(ARGV[#ARGV]))
+            return 1
+        """.trimIndent()
+
+        val script = DefaultRedisScript<Long>()
+        script.setScriptText(scriptText)
+        script.setResultType(Long::class.java)
+
+        val scriptArgs = values + ttlSeconds.toString()
+
+        return redisTemplate.execute(script, listOf(key), scriptArgs)
+            .next()
+            .map { it > 0 }
     }
 
     /**
@@ -120,19 +139,27 @@ class FeedCacheService(
      * 사용자의 모든 추천 캐시를 삭제합니다.
      * 재추천이 필요할 때 사용합니다.
      *
+     * SCAN 명령어를 사용하여 프로덕션 환경에서도 Redis를 블로킹하지 않고
+     * 안전하게 키를 스캔합니다. KEYS 명령어는 모든 키를 스캔하는 동안
+     * 다른 요청을 블로킹하므로 사용하지 않습니다.
+     *
      * @param userId 사용자 ID
      * @return 삭제 완료 신호
      */
     fun clearUserCache(userId: UUID): Mono<Boolean> {
         val pattern = "feed:rec:$userId:batch:*"
+        val scanOptions = org.springframework.data.redis.core.ScanOptions.scanOptions()
+            .match(pattern)
+            .build()
 
-        return redisTemplate.keys(pattern)
+        return redisTemplate.scan(scanOptions)
             .collectList()
             .flatMap { keys ->
                 if (keys.isEmpty()) {
                     Mono.just(true)
                 } else {
-                    redisTemplate.delete(*keys.toTypedArray())
+                    // Spread operator 대신 Flux를 사용하여 성능 최적화
+                    redisTemplate.delete(reactor.core.publisher.Flux.fromIterable(keys))
                         .map { it > 0 }
                 }
             }
@@ -162,7 +189,7 @@ class FeedCacheService(
          *
          * 사용자 세션 유지 시간
          */
-        val BATCH_TTL: Duration = Duration.ofMinutes(30)
+        val batchTtl: Duration = Duration.ofMinutes(30)
 
         /**
          * Prefetch 임계값 (50%)

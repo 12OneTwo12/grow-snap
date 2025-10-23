@@ -954,6 +954,60 @@ logger.warn("Redis port already in use")
 - [ ] **이모티콘 제거**: 코드, 주석, 로그에 이모티콘(✅, ⚠️, 🔥 등)이 없는가?
 - [ ] **로그 레벨 적절성**: 적절한 로그 레벨(info, warn, error, debug)을 사용했는가?
 
+#### 3. FQCN 사용 금지
+
+- ❌ **절대 사용 금지**: Fully Qualified Class Name (FQCN) 사용 금지
+- ✅ **반드시 사용**: import 문 사용
+
+```kotlin
+// ❌ BAD: FQCN 사용
+val scanOptions = org.springframework.data.redis.core.ScanOptions.scanOptions()
+    .match(pattern)
+    .build()
+
+return redisTemplate.execute { connection ->
+    connection.scriptingCommands()
+        .eval(
+            ByteBuffer.wrap(script.toByteArray()),
+            org.springframework.data.redis.connection.ReturnType.INTEGER,  // FQCN 사용 금지!
+            1,
+            ByteBuffer.wrap(key.toByteArray())
+        )
+}
+
+// ✅ GOOD: import 사용
+import org.springframework.data.redis.core.ScanOptions
+import org.springframework.data.redis.connection.ReturnType
+
+val scanOptions = ScanOptions.scanOptions()
+    .match(pattern)
+    .build()
+
+return redisTemplate.execute { connection ->
+    connection.scriptingCommands()
+        .eval(
+            ByteBuffer.wrap(script.toByteArray()),
+            ReturnType.INTEGER,  // import한 클래스 사용
+            1,
+            ByteBuffer.wrap(key.toByteArray())
+        )
+}
+```
+
+**이유**:
+- 코드 가독성 저하
+- 네임스페이스 오염
+- IDE의 자동 import 기능 활용 불가
+- 코드 리뷰 및 유지보수 어려움
+
+#### 📋 FQCN 체크리스트
+
+코드 작성 전 반드시 확인:
+
+- [ ] **FQCN 사용 금지**: `package.name.ClassName` 형태로 직접 사용하지 않았는가?
+- [ ] **import 문 사용**: 모든 외부 클래스는 import하여 사용했는가?
+- [ ] **IDE 자동 import**: IDE의 자동 import 기능을 활용했는가?
+
 ---
 
 ### 네이밍
@@ -1251,6 +1305,7 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 13. **Database Query**: SELECT 쿼리에서 asterisk (*) 사용 절대 금지, 필요한 컬럼만 명시적으로 선택
 14. **로깅 규칙**: println 절대 금지, SLF4J Logger 필수 사용
 15. **이모티콘 금지**: 코드, 주석, 로그에 이모티콘 절대 사용 금지 (문서 파일만 허용)
+16. **FQCN 금지**: Fully Qualified Class Name 사용 금지, 반드시 import 문 사용
 
 ---
 

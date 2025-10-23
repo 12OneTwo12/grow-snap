@@ -5,6 +5,7 @@ import me.onetwo.growsnap.domain.feed.repository.FeedRepository
 import me.onetwo.growsnap.domain.feed.service.recommendation.RecommendationService
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageRequest
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageResponse
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
@@ -148,7 +149,10 @@ class FeedServiceImpl(
                     generateAndCacheBatch(userId, nextBatch)
                 }
                 .subscribeOn(Schedulers.boundedElastic())  // 백그라운드 스레드
-                .subscribe()  // fire-and-forget
+                .subscribe(
+                    { },  // onNext: 성공 시 아무것도 하지 않음
+                    { error -> logger.error("Failed to prefetch next batch for user {}", userId, error) }  // onError
+                )
         }
     }
 
@@ -185,6 +189,8 @@ class FeedServiceImpl(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(FeedServiceImpl::class.java)
+
         /**
          * 최근 본 콘텐츠 조회 개수 (중복 방지용)
          */
