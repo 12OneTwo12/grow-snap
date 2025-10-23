@@ -289,6 +289,122 @@ class FeedRepositoryImpl(
     }
 
     /**
+     * 인기 콘텐츠 ID 목록 조회
+     *
+     * 인터랙션 가중치 기반 인기도 점수가 높은 콘텐츠를 조회합니다.
+     *
+     * ### 인기도 계산 공식
+     * ```
+     * popularity_score = view_count * 1.0
+     *                  + like_count * 5.0
+     *                  + comment_count * 3.0
+     *                  + save_count * 7.0
+     *                  + share_count * 10.0
+     * ```
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 인기 콘텐츠 ID 목록 (인기도 순 정렬)
+     */
+    override fun findPopularContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
+        return Mono.fromCallable {
+            // 인기도 점수 계산식
+            val popularityScore = CONTENT_INTERACTIONS.VIEW_COUNT.cast(Double::class.java)
+                .plus(CONTENT_INTERACTIONS.LIKE_COUNT.mul(5))
+                .plus(CONTENT_INTERACTIONS.COMMENT_COUNT.mul(3))
+                .plus(CONTENT_INTERACTIONS.SAVE_COUNT.mul(7))
+                .plus(CONTENT_INTERACTIONS.SHARE_COUNT.mul(10))
+
+            var query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_INTERACTIONS).on(CONTENT_INTERACTIONS.CONTENT_ID.eq(CONTENTS.ID))
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+
+            // 제외할 콘텐츠 필터링
+            if (excludeIds.isNotEmpty()) {
+                query = query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            }
+
+            query
+                .orderBy(popularityScore.desc())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
+     * 신규 콘텐츠 ID 목록 조회
+     *
+     * 최근 업로드된 콘텐츠를 조회합니다.
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 신규 콘텐츠 ID 목록 (최신순 정렬)
+     */
+    override fun findNewContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
+        return Mono.fromCallable {
+            var query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+
+            // 제외할 콘텐츠 필터링
+            if (excludeIds.isNotEmpty()) {
+                query = query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            }
+
+            query
+                .orderBy(CONTENTS.CREATED_AT.desc())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
+     * 랜덤 콘텐츠 ID 목록 조회
+     *
+     * 무작위 콘텐츠를 조회하여 다양성을 확보합니다.
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 랜덤 콘텐츠 ID 목록 (무작위 정렬)
+     */
+    override fun findRandomContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
+        return Mono.fromCallable {
+            var query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+
+            // 제외할 콘텐츠 필터링
+            if (excludeIds.isNotEmpty()) {
+                query = query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            }
+
+            query
+                .orderBy(org.jooq.impl.DSL.rand())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
      * 여러 콘텐츠의 자막 정보를 배치로 조회 (N+1 문제 방지)
      *
      * @param contentIds 콘텐츠 ID 목록
