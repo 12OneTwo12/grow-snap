@@ -57,11 +57,28 @@ class FeedRepositoryImpl(
         return Mono.fromCallable {
             var query = dslContext
                 .select(
-                    CONTENTS.asterisk(),
-                    CONTENT_METADATA.asterisk(),
-                    CONTENT_INTERACTIONS.asterisk(),
+                    // CONTENTS 필요 컬럼만 명시적으로 선택
+                    CONTENTS.ID,
+                    CONTENTS.CONTENT_TYPE,
+                    CONTENTS.URL,
+                    CONTENTS.THUMBNAIL_URL,
+                    CONTENTS.DURATION,
+                    CONTENTS.WIDTH,
+                    CONTENTS.HEIGHT,
+                    CONTENTS.CREATED_AT,
+                    // CONTENT_METADATA 필요 컬럼만 명시적으로 선택
+                    CONTENT_METADATA.TITLE,
+                    CONTENT_METADATA.DESCRIPTION,
+                    CONTENT_METADATA.CATEGORY,
+                    CONTENT_METADATA.TAGS,
+                    // CONTENT_INTERACTIONS 필요 컬럼만 명시적으로 선택
+                    CONTENT_INTERACTIONS.LIKE_COUNT,
+                    CONTENT_INTERACTIONS.COMMENT_COUNT,
+                    CONTENT_INTERACTIONS.SAVE_COUNT,
+                    CONTENT_INTERACTIONS.SHARE_COUNT,
+                    CONTENT_INTERACTIONS.VIEW_COUNT,
+                    // USERS, USER_PROFILES
                     USERS.ID,
-                    USERS.EMAIL,
                     USER_PROFILES.NICKNAME,
                     USER_PROFILES.PROFILE_IMAGE_URL,
                     USER_PROFILES.FOLLOWER_COUNT
@@ -127,11 +144,28 @@ class FeedRepositoryImpl(
         return Mono.fromCallable {
             var query = dslContext
                 .select(
-                    CONTENTS.asterisk(),
-                    CONTENT_METADATA.asterisk(),
-                    CONTENT_INTERACTIONS.asterisk(),
+                    // CONTENTS 필요 컬럼만 명시적으로 선택
+                    CONTENTS.ID,
+                    CONTENTS.CONTENT_TYPE,
+                    CONTENTS.URL,
+                    CONTENTS.THUMBNAIL_URL,
+                    CONTENTS.DURATION,
+                    CONTENTS.WIDTH,
+                    CONTENTS.HEIGHT,
+                    CONTENTS.CREATED_AT,
+                    // CONTENT_METADATA 필요 컬럼만 명시적으로 선택
+                    CONTENT_METADATA.TITLE,
+                    CONTENT_METADATA.DESCRIPTION,
+                    CONTENT_METADATA.CATEGORY,
+                    CONTENT_METADATA.TAGS,
+                    // CONTENT_INTERACTIONS 필요 컬럼만 명시적으로 선택
+                    CONTENT_INTERACTIONS.LIKE_COUNT,
+                    CONTENT_INTERACTIONS.COMMENT_COUNT,
+                    CONTENT_INTERACTIONS.SAVE_COUNT,
+                    CONTENT_INTERACTIONS.SHARE_COUNT,
+                    CONTENT_INTERACTIONS.VIEW_COUNT,
+                    // USERS, USER_PROFILES
                     USERS.ID,
-                    USERS.EMAIL,
                     USER_PROFILES.NICKNAME,
                     USER_PROFILES.PROFILE_IMAGE_URL,
                     USER_PROFILES.FOLLOWER_COUNT
