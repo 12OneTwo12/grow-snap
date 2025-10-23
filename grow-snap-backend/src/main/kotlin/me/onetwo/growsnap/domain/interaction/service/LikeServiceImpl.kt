@@ -1,6 +1,9 @@
 package me.onetwo.growsnap.domain.interaction.service
 
+import me.onetwo.growsnap.domain.analytics.dto.InteractionEventRequest
+import me.onetwo.growsnap.domain.analytics.dto.InteractionType
 import me.onetwo.growsnap.domain.analytics.repository.ContentInteractionRepository
+import me.onetwo.growsnap.domain.analytics.service.AnalyticsService
 import me.onetwo.growsnap.domain.interaction.dto.LikeCountResponse
 import me.onetwo.growsnap.domain.interaction.dto.LikeResponse
 import me.onetwo.growsnap.domain.interaction.repository.UserLikeRepository
@@ -16,14 +19,19 @@ import java.util.UUID
  *
  * ### 처리 흐름
  * 1. 좋아요 상태 변경 (user_likes 테이블)
- * 2. 카운터 증가/감소 (content_interactions 테이블)
+ * 2. AnalyticsService를 통한 이벤트 발행
+ *    - 카운터 증가 (content_interactions 테이블)
+ *    - Spring Event 발행 (UserInteractionEvent)
+ *    - user_content_interactions 테이블 저장 (협업 필터링용)
  *
  * @property userLikeRepository 사용자 좋아요 레포지토리
+ * @property analyticsService Analytics 서비스 (이벤트 발행)
  * @property contentInteractionRepository 콘텐츠 인터랙션 레포지토리
  */
 @Service
 class LikeServiceImpl(
     private val userLikeRepository: UserLikeRepository,
+    private val analyticsService: AnalyticsService,
     private val contentInteractionRepository: ContentInteractionRepository
 ) : LikeService {
 
@@ -32,7 +40,10 @@ class LikeServiceImpl(
      *
      * ### 처리 흐름
      * 1. user_likes 테이블에 레코드 생성
-     * 2. content_interactions의 like_count 증가
+     * 2. AnalyticsService.trackInteractionEvent(LIKE) 호출
+     *    - content_interactions의 like_count 증가
+     *    - UserInteractionEvent 발행
+     *    - UserInteractionEventListener가 user_content_interactions 저장 (협업 필터링용)
      *
      * ### 비즈니스 규칙
      * - 이미 좋아요가 있으면 중복 생성 안 함 (idempotent)
@@ -51,9 +62,18 @@ class LikeServiceImpl(
                     logger.debug("Content already liked: userId={}, contentId={}", userId, contentId)
                     getLikeResponse(userId, contentId, true)
                 } else {
-                    // 좋아요 생성 및 카운터 증가
+                    // 1. user_likes 테이블에 저장
                     userLikeRepository.save(userId, contentId)
-                        .then(contentInteractionRepository.incrementLikeCount(contentId))
+                        .then(
+                            // 2. AnalyticsService로 이벤트 발행 (카운터 증가 + user_content_interactions 저장)
+                            analyticsService.trackInteractionEvent(
+                                userId,
+                                InteractionEventRequest(
+                                    contentId = contentId,
+                                    interactionType = InteractionType.LIKE
+                                )
+                            )
+                        )
                         .then(getLikeResponse(userId, contentId, true))
                 }
             }
@@ -69,9 +89,11 @@ class LikeServiceImpl(
      * ### 처리 흐름
      * 1. user_likes 테이블에서 레코드 삭제 (Soft Delete)
      * 2. content_interactions의 like_count 감소
+     * 3. user_content_interactions는 삭제하지 않음 (협업 필터링 데이터 보존)
      *
      * ### 비즈니스 규칙
      * - 좋아요가 없으면 아무 작업 안 함 (idempotent)
+     * - 협업 필터링: 한 번이라도 좋아요를 누른 기록은 보존
      *
      * @param userId 사용자 ID
      * @param contentId 콘텐츠 ID
