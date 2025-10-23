@@ -191,6 +191,58 @@ grow-snap-backend/
 - ❌ 데이터베이스 접근 금지
 - ❌ 복잡한 데이터 처리 금지 (FilePart 처리, 파일 변환 등)
 
+##### @AuthenticationPrincipal 사용 규칙 (Spring Security 인증/인가)
+
+**원칙**: userId를 파라미터로 받아야 한다면 Spring Security Context에서 `@AuthenticationPrincipal`로 추출해야 합니다.
+
+**중요**: 이 프로젝트는 Spring Security를 사용하여 인증/인가를 처리합니다. 사용자 ID는 JWT 토큰에서 추출되어 Spring Security Context에 저장됩니다.
+
+#### ✅ GOOD: @AuthenticationPrincipal 사용
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/analytics")
+class AnalyticsController(
+    private val analyticsService: AnalyticsService
+) {
+    @PostMapping("/views")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun trackViewEvent(
+        @AuthenticationPrincipal userId: UUID,  // ✅ Spring Security Context에서 추출
+        @Valid @RequestBody request: ViewEventRequest
+    ): Mono<Void> {
+        return analyticsService.trackViewEvent(userId, request)
+    }
+}
+```
+
+#### ❌ BAD: Request Body나 Path Variable로 userId 받기
+
+```kotlin
+// ❌ BAD: userId를 Request Body에서 받음 (보안 취약)
+@PostMapping("/views")
+fun trackViewEvent(
+    @RequestBody request: ViewEventRequest  // userId가 request 안에 포함
+): Mono<Void> {
+    return analyticsService.trackViewEvent(request.userId, request)
+}
+
+// ❌ BAD: userId를 Path Variable로 받음 (변조 가능)
+@PostMapping("/users/{userId}/views")
+fun trackViewEvent(
+    @PathVariable userId: UUID,  // 클라이언트가 임의로 변경 가능
+    @RequestBody request: ViewEventRequest
+): Mono<Void> {
+    return analyticsService.trackViewEvent(userId, request)
+}
+```
+
+#### 📋 @AuthenticationPrincipal 체크리스트
+
+- [ ] **userId는 @AuthenticationPrincipal로 추출**: Request Body나 Path Variable로 받지 않기
+- [ ] **JWT 토큰 검증 의존**: Spring Security가 토큰을 검증한 후 userId 제공
+- [ ] **보안 우선**: 클라이언트가 userId를 임의로 변경할 수 없도록 설계
+
 #### Service (서비스)
 
 **역할**: 비즈니스 로직 처리
@@ -1288,6 +1340,189 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 
 ---
 
+## 📨 Spring Event 패턴 (비동기 이벤트 처리)
+
+### 개요
+
+Spring Event는 애플리케이션 내에서 비동기 이벤트 기반 통신을 구현하는 패턴입니다.
+
+**언제 사용하는가?**
+- 메인 트랜잭션과 독립적으로 실행되어야 하는 작업
+- 실패해도 메인 요청에 영향을 주지 않아야 하는 작업
+- 여러 도메인 간 결합도를 낮추고 싶을 때
+
+**GrowSnap에서의 사용 예시**:
+- 사용자가 콘텐츠에 좋아요를 누를 때
+  1. 메인 트랜잭션: `content_interactions.like_count` 증가
+  2. Spring Event 발행: `UserInteractionEvent`
+  3. 비동기 처리: `user_content_interactions` 테이블에 저장 (협업 필터링용)
+
+### ✅ Spring Event 패턴 Best Practice
+
+#### 1. 이벤트 클래스 정의
+
+```kotlin
+/**
+ * 사용자 인터랙션 이벤트
+ *
+ * 사용자의 콘텐츠 인터랙션 (LIKE, SAVE, SHARE)을 기록하기 위한 이벤트입니다.
+ *
+ * @property userId 사용자 ID
+ * @property contentId 콘텐츠 ID
+ * @property interactionType 인터랙션 타입 (LIKE, SAVE, SHARE)
+ */
+data class UserInteractionEvent(
+    val userId: UUID,
+    val contentId: UUID,
+    val interactionType: InteractionType
+)
+```
+
+#### 2. 이벤트 발행자 (Publisher)
+
+```kotlin
+@Service
+class AnalyticsServiceImpl(
+    private val contentInteractionRepository: ContentInteractionRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher  // Spring 제공
+) : AnalyticsService {
+
+    override fun trackInteractionEvent(userId: UUID, request: InteractionEventRequest): Mono<Void> {
+        val contentId = request.contentId!!
+        val interactionType = request.interactionType!!
+
+        // 1. 메인 트랜잭션: 카운터 증가
+        val incrementCounter = when (interactionType) {
+            InteractionType.LIKE -> contentInteractionRepository.incrementLikeCount(contentId)
+            InteractionType.SAVE -> contentInteractionRepository.incrementSaveCount(contentId)
+            InteractionType.SHARE -> contentInteractionRepository.incrementShareCount(contentId)
+        }
+
+        // 2. 이벤트 발행 (doOnSuccess: 메인 트랜잭션 성공 시에만 발행)
+        return incrementCounter.doOnSuccess {
+            logger.debug(
+                "Publishing UserInteractionEvent: userId={}, contentId={}, type={}",
+                userId,
+                contentId,
+                interactionType
+            )
+            applicationEventPublisher.publishEvent(
+                UserInteractionEvent(
+                    userId = userId,
+                    contentId = contentId,
+                    interactionType = interactionType
+                )
+            )
+        }.then()
+    }
+}
+```
+
+#### 3. 이벤트 리스너 (Listener)
+
+```kotlin
+@Component
+class UserInteractionEventListener(
+    private val userContentInteractionRepository: UserContentInteractionRepository
+) {
+
+    /**
+     * 사용자 인터랙션 이벤트 처리
+     *
+     * ### 처리 흐름
+     * 1. 메인 트랜잭션 커밋 후 실행 (@TransactionalEventListener + AFTER_COMMIT)
+     * 2. 비동기로 실행 (@Async)
+     * 3. user_content_interactions 테이블에 저장
+     *
+     * ### 장애 격리
+     * - 이 메서드가 실패해도 메인 트랜잭션에 영향 없음
+     * - 로그만 남기고 예외를 삼킴
+     *
+     * @param event 사용자 인터랙션 이벤트
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun handleUserInteractionEvent(event: UserInteractionEvent) {
+        try {
+            logger.debug(
+                "Handling UserInteractionEvent: userId={}, contentId={}, type={}",
+                event.userId,
+                event.contentId,
+                event.interactionType
+            )
+
+            // user_content_interactions 테이블에 저장 (협업 필터링용)
+            userContentInteractionRepository
+                .saveInteraction(event.userId, event.contentId, event.interactionType)
+                .subscribe(
+                    { logger.debug("User interaction saved successfully") },
+                    { error ->
+                        logger.error(
+                            "Failed to save user interaction: userId={}, contentId={}, type={}",
+                            event.userId,
+                            event.contentId,
+                            event.interactionType,
+                            error
+                        )
+                    }
+                )
+        } catch (e: Exception) {
+            // 예외를 삼켜서 메인 트랜잭션에 영향을 주지 않음
+            logger.error("Failed to handle UserInteractionEvent", e)
+        }
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(UserInteractionEventListener::class.java)
+    }
+}
+```
+
+#### 4. Spring Async 설정
+
+```kotlin
+@Configuration
+@EnableAsync
+class AsyncConfig : AsyncConfigurerSupport() {
+
+    override fun getAsyncExecutor(): Executor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 5
+        executor.maxPoolSize = 10
+        executor.queueCapacity = 100
+        executor.setThreadNamePrefix("async-event-")
+        executor.initialize()
+        return executor
+    }
+}
+```
+
+### 📋 Spring Event 패턴 체크리스트
+
+- [ ] **이벤트 클래스**: data class로 정의, 필요한 최소 정보만 포함
+- [ ] **이벤트 발행**: `applicationEventPublisher.publishEvent()` 사용
+- [ ] **발행 시점**: 메인 트랜잭션 성공 시에만 발행 (`doOnSuccess`)
+- [ ] **이벤트 리스너**: `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
+- [ ] **비동기 처리**: `@Async` 사용
+- [ ] **장애 격리**: try-catch로 예외 삼킴, 로그만 남김
+- [ ] **Spring Async 설정**: `@EnableAsync` + ThreadPoolTaskExecutor 설정
+
+### ⚠️ 주의사항
+
+1. **메인 트랜잭션과 독립성 보장**
+   - 이벤트 리스너 실패가 메인 요청에 영향을 주지 않도록 설계
+   - `TransactionPhase.AFTER_COMMIT` 사용 필수
+
+2. **멱등성(Idempotency) 고려**
+   - 이벤트가 중복 발생할 수 있으므로 멱등성 보장 필요
+   - 예: UNIQUE 제약 조건 설정
+
+3. **로깅 충실**
+   - 이벤트 발행/처리 시점에 DEBUG 로그 남기기
+   - 실패 시 ERROR 로그로 추적 가능하도록
+
+---
+
 ## 🎯 요약: Claude가 반드시 지킬 것
 
 1. **TDD**: 테스트 → 구현 → 리팩토링 (시나리오 기반, Given-When-Then 주석 필수)
@@ -1306,10 +1541,12 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 14. **로깅 규칙**: println 절대 금지, SLF4J Logger 필수 사용
 15. **이모티콘 금지**: 코드, 주석, 로그에 이모티콘 절대 사용 금지 (문서 파일만 허용)
 16. **FQCN 금지**: Fully Qualified Class Name 사용 금지, 반드시 import 문 사용
+17. **@AuthenticationPrincipal**: userId는 @AuthenticationPrincipal로 Spring Security Context에서 추출, Request Body/Path Variable 사용 금지
+18. **Spring Event 패턴**: 비동기 이벤트 처리 시 @TransactionalEventListener(AFTER_COMMIT) + @Async 사용, 메인 트랜잭션과 독립성 보장
 
 ---
 
-**작성일**: 2025-10-22
-**버전**: 1.0.0
+**작성일**: 2025-10-23
+**버전**: 1.1.0
 **대상**: Claude (AI 개발 어시스턴트)
 **작성자**: @12OneTwo12
