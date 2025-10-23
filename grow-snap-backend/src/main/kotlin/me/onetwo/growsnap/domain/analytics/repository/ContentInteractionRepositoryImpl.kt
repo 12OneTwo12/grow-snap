@@ -29,14 +29,7 @@ class ContentInteractionRepositoryImpl(
      * @return 업데이트 완료 신호
      */
     override fun incrementViewCount(contentId: UUID): Mono<Void> {
-        return Mono.fromCallable {
-            dslContext.update(CONTENT_INTERACTIONS)
-                .set(CONTENT_INTERACTIONS.VIEW_COUNT, CONTENT_INTERACTIONS.VIEW_COUNT.plus(1))
-                .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
-                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
-                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
-                .execute()
-        }.then()
+        return incrementCount(contentId, CONTENT_INTERACTIONS.VIEW_COUNT)
     }
 
     /**
@@ -48,14 +41,7 @@ class ContentInteractionRepositoryImpl(
      * @return 업데이트 완료 신호
      */
     override fun incrementLikeCount(contentId: UUID): Mono<Void> {
-        return Mono.fromCallable {
-            dslContext.update(CONTENT_INTERACTIONS)
-                .set(CONTENT_INTERACTIONS.LIKE_COUNT, CONTENT_INTERACTIONS.LIKE_COUNT.plus(1))
-                .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
-                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
-                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
-                .execute()
-        }.then()
+        return incrementCount(contentId, CONTENT_INTERACTIONS.LIKE_COUNT)
     }
 
     /**
@@ -67,14 +53,7 @@ class ContentInteractionRepositoryImpl(
      * @return 업데이트 완료 신호
      */
     override fun incrementSaveCount(contentId: UUID): Mono<Void> {
-        return Mono.fromCallable {
-            dslContext.update(CONTENT_INTERACTIONS)
-                .set(CONTENT_INTERACTIONS.SAVE_COUNT, CONTENT_INTERACTIONS.SAVE_COUNT.plus(1))
-                .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
-                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
-                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
-                .execute()
-        }.then()
+        return incrementCount(contentId, CONTENT_INTERACTIONS.SAVE_COUNT)
     }
 
     /**
@@ -86,14 +65,7 @@ class ContentInteractionRepositoryImpl(
      * @return 업데이트 완료 신호
      */
     override fun incrementShareCount(contentId: UUID): Mono<Void> {
-        return Mono.fromCallable {
-            dslContext.update(CONTENT_INTERACTIONS)
-                .set(CONTENT_INTERACTIONS.SHARE_COUNT, CONTENT_INTERACTIONS.SHARE_COUNT.plus(1))
-                .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
-                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
-                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
-                .execute()
-        }.then()
+        return incrementCount(contentId, CONTENT_INTERACTIONS.SHARE_COUNT)
     }
 
     /**
@@ -105,9 +77,22 @@ class ContentInteractionRepositoryImpl(
      * @return 업데이트 완료 신호
      */
     override fun incrementCommentCount(contentId: UUID): Mono<Void> {
+        return incrementCount(contentId, CONTENT_INTERACTIONS.COMMENT_COUNT)
+    }
+
+    /**
+     * 카운터 증가 공통 로직
+     *
+     * 지정된 필드를 1 증가시키고, updated_at을 갱신합니다.
+     *
+     * @param contentId 콘텐츠 ID
+     * @param field 증가시킬 필드
+     * @return 업데이트 완료 신호
+     */
+    private fun incrementCount(contentId: UUID, field: org.jooq.Field<Int?>): Mono<Void> {
         return Mono.fromCallable {
             dslContext.update(CONTENT_INTERACTIONS)
-                .set(CONTENT_INTERACTIONS.COMMENT_COUNT, CONTENT_INTERACTIONS.COMMENT_COUNT.plus(1))
+                .set(field, field.plus(1))
                 .set(CONTENT_INTERACTIONS.UPDATED_AT, LocalDateTime.now())
                 .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
                 .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)

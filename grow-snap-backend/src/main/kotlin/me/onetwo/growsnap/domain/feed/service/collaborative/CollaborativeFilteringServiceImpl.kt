@@ -109,47 +109,42 @@ class CollaborativeFilteringServiceImpl(
 
                 logger.debug("Found {} similar users for user {}", similarUsers.size, userId)
 
-                // 3. 그 사용자들이 좋아한 콘텐츠 찾기
+                // 3. 그 사용자들이 좋아한 콘텐츠 찾기 (스트리밍 방식)
                 Flux.fromIterable(similarUsers)
                     .flatMap { similarUserId ->
                         userContentInteractionRepository
                             .findAllInteractionsByUser(similarUserId, MAX_ITEMS_PER_SIMILAR_USER)
                     }
-                    .collectList()
-                    .flatMapMany { candidateInteractions ->
-                        // 4. 콘텐츠별 점수 계산
-                        val contentScores = mutableMapOf<UUID, Double>()
-
-                        for ((contentId, interactionType) in candidateInteractions) {
-                            // 이미 내가 인터랙션한 콘텐츠는 제외
-                            if (myContentIds.contains(contentId)) {
-                                continue
-                            }
-
-                            // 인터랙션 타입별 가중치 적용
+                    // 4. 이미 내가 인터랙션한 콘텐츠 제외
+                    .filter { (contentId, _) -> !myContentIds.contains(contentId) }
+                    // 5. contentId로 그룹화하여 점수 계산 (메모리 효율적)
+                    .groupBy { it.first }  // contentId로 그룹화
+                    .flatMap { group ->
+                        group.reduce(0.0) { score, (_, interactionType) ->
                             val weight = when (interactionType) {
                                 InteractionType.LIKE -> LIKE_WEIGHT
                                 InteractionType.SAVE -> SAVE_WEIGHT
                                 InteractionType.SHARE -> SHARE_WEIGHT
                                 InteractionType.COMMENT -> 0.0  // COMMENT는 점수에 포함 안 함
                             }
-
-                            contentScores[contentId] = (contentScores[contentId] ?: 0.0) + weight
-                        }
-
+                            score + weight
+                        }.map { totalScore -> group.key() to totalScore }
+                    }
+                    // 6. 점수가 0보다 큰 것만 필터링 (COMMENT 제외)
+                    .filter { (_, score) -> score > 0.0 }
+                    // 7. 점수 높은 순으로 정렬
+                    .collectList()
+                    .flatMapMany { scoreList ->
                         logger.debug(
                             "Calculated scores for {} candidate contents for user {}",
-                            contentScores.size,
+                            scoreList.size,
                             userId
                         )
 
-                        // 5. 점수 높은 순으로 정렬하여 반환 (점수가 0보다 큰 것만)
-                        val recommendedContents = contentScores
-                            .entries
-                            .filter { it.value > 0.0 }  // COMMENT (점수 0.0) 제외
-                            .sortedByDescending { it.value }
+                        val recommendedContents = scoreList
+                            .sortedByDescending { it.second }
                             .take(limit)
-                            .map { it.key }
+                            .map { it.first }
 
                         logger.debug(
                             "Returning {} recommended contents for user {}",

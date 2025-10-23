@@ -68,36 +68,46 @@ class UserInteractionEventListener(
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Async
     fun handleUserInteractionEvent(event: UserInteractionEvent) {
-        logger.debug(
-            "Handling UserInteractionEvent: userId={}, contentId={}, type={}",
-            event.userId,
-            event.contentId,
-            event.interactionType
-        )
+        try {
+            logger.debug(
+                "Handling UserInteractionEvent: userId={}, contentId={}, type={}",
+                event.userId,
+                event.contentId,
+                event.interactionType
+            )
 
-        userContentInteractionRepository.save(
-            event.userId,
-            event.contentId,
-            event.interactionType
-        ).subscribe(
-            {
-                logger.debug(
-                    "User interaction saved successfully: userId={}, contentId={}, type={}",
-                    event.userId,
-                    event.contentId,
-                    event.interactionType
-                )
-            },
-            { error ->
-                logger.error(
-                    "Failed to save user interaction: userId={}, contentId={}, type={}",
-                    event.userId,
-                    event.contentId,
-                    event.interactionType,
-                    error
-                )
-            }
-        )
+            userContentInteractionRepository.save(
+                event.userId,
+                event.contentId,
+                event.interactionType
+            ).subscribe(
+                {
+                    logger.debug(
+                        "User interaction saved successfully: userId={}, contentId={}, type={}",
+                        event.userId,
+                        event.contentId,
+                        event.interactionType
+                    )
+                },
+                { error ->
+                    logger.error(
+                        "Failed to save user interaction: userId={}, contentId={}, type={}",
+                        event.userId,
+                        event.contentId,
+                        event.interactionType,
+                        error
+                    )
+                }
+            )
+        } catch (e: Exception) {
+            logger.error(
+                "Failed to handle UserInteractionEvent: userId={}, contentId={}, type={}",
+                event.userId,
+                event.contentId,
+                event.interactionType,
+                e
+            )
+        }
     }
 
     companion object {
