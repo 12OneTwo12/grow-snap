@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.data.redis.core.ReactiveListOperations
 import org.springframework.data.redis.core.ReactiveRedisTemplate
+import org.springframework.data.redis.core.ScanOptions
+import org.springframework.data.redis.core.script.RedisScript
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.test.StepVerifier
@@ -118,11 +120,15 @@ class FeedCacheServiceTest {
         fun saveRecommendationBatch_WithValidData_SavesAndReturnsTrue() {
             // Given: 저장할 콘텐츠 ID 목록
             val contentIds = List(250) { UUID.randomUUID() }
-            val contentIdStrings = contentIds.map { it.toString() }
-            val key = "feed:rec:$userId:batch:$batchNumber"
 
-            every { listOps.rightPushAll(key, contentIdStrings) } returns Mono.just(250L)
-            every { reactiveRedisTemplate.expire(key, Duration.ofMinutes(30)) } returns Mono.just(true)
+            // Lua 스크립트 실행 결과 mock
+            every {
+                reactiveRedisTemplate.execute(
+                    any<RedisScript<Long>>(),
+                    any<List<String>>(),
+                    any<List<String>>()
+                )
+            } returns Flux.just(1L)
 
             // When: Redis에 저장
             val result = feedCacheService.saveRecommendationBatch(userId, batchNumber, contentIds)
@@ -134,8 +140,13 @@ class FeedCacheServiceTest {
                 }
                 .verifyComplete()
 
-            verify(exactly = 1) { listOps.rightPushAll(key, contentIdStrings) }
-            verify(exactly = 1) { reactiveRedisTemplate.expire(key, Duration.ofMinutes(30)) }
+            verify(exactly = 1) {
+                reactiveRedisTemplate.execute(
+                    any<RedisScript<Long>>(),
+                    any<List<String>>(),
+                    any<List<String>>()
+                )
+            }
         }
 
         @Test
@@ -154,8 +165,14 @@ class FeedCacheServiceTest {
                 }
                 .verifyComplete()
 
-            // Then: Redis 호출 없음
-            verify(exactly = 0) { listOps.rightPushAll(any(), any<List<String>>()) }
+            // Then: Redis 호출 없음 (execute가 호출되지 않아야 함)
+            verify(exactly = 0) {
+                reactiveRedisTemplate.execute(
+                    any<RedisScript<Long>>(),
+                    any<List<String>>(),
+                    any<List<String>>()
+                )
+            }
         }
 
         @Test
@@ -163,17 +180,27 @@ class FeedCacheServiceTest {
         fun saveRecommendationBatch_SetsTTL() {
             // Given: 저장할 콘텐츠 ID 목록
             val contentIds = List(10) { UUID.randomUUID() }
-            val contentIdStrings = contentIds.map { it.toString() }
-            val key = "feed:rec:$userId:batch:$batchNumber"
 
-            every { listOps.rightPushAll(key, contentIdStrings) } returns Mono.just(10L)
-            every { reactiveRedisTemplate.expire(key, Duration.ofMinutes(30)) } returns Mono.just(true)
+            // Lua 스크립트 실행 결과 mock
+            every {
+                reactiveRedisTemplate.execute(
+                    any<RedisScript<Long>>(),
+                    any<List<String>>(),
+                    any<List<String>>()
+                )
+            } returns Flux.just(1L)
 
             // When: Redis에 저장
             feedCacheService.saveRecommendationBatch(userId, batchNumber, contentIds).block()
 
-            // Then: 30분 TTL로 expire 호출
-            verify(exactly = 1) { reactiveRedisTemplate.expire(key, Duration.ofMinutes(30)) }
+            // Then: Lua 스크립트가 TTL과 함께 실행됨 (스크립트 내부에서 EXPIRE 호출)
+            verify(exactly = 1) {
+                reactiveRedisTemplate.execute(
+                    any<RedisScript<Long>>(),
+                    any<List<String>>(),
+                    any<List<String>>()
+                )
+            }
         }
     }
 
@@ -234,7 +261,7 @@ class FeedCacheServiceTest {
                 "feed:rec:$userId:batch:2"
             )
 
-            every { reactiveRedisTemplate.scan(any()) } returns Flux.fromIterable(keys)
+            every { reactiveRedisTemplate.scan(any<ScanOptions>()) } returns Flux.fromIterable(keys)
             every { reactiveRedisTemplate.delete(any<Flux<String>>()) } returns Mono.just(3L)
 
             // When: 사용자 캐시 삭제
@@ -247,7 +274,7 @@ class FeedCacheServiceTest {
                 }
                 .verifyComplete()
 
-            verify(exactly = 1) { reactiveRedisTemplate.scan(any()) }
+            verify(exactly = 1) { reactiveRedisTemplate.scan(any<ScanOptions>()) }
             verify(exactly = 1) { reactiveRedisTemplate.delete(any<Flux<String>>()) }
         }
 
@@ -255,7 +282,7 @@ class FeedCacheServiceTest {
         @DisplayName("삭제할 캐시가 없는 경우에도 true를 반환한다")
         fun clearUserCache_WithoutCachedData_ReturnsTrue() {
             // Given: 캐시에 데이터 없음
-            every { reactiveRedisTemplate.scan(any()) } returns Flux.empty()
+            every { reactiveRedisTemplate.scan(any<ScanOptions>()) } returns Flux.empty()
 
             // When: 캐시 삭제 시도
             val result = feedCacheService.clearUserCache(userId)
@@ -267,7 +294,7 @@ class FeedCacheServiceTest {
                 }
                 .verifyComplete()
 
-            verify(exactly = 1) { reactiveRedisTemplate.scan(any()) }
+            verify(exactly = 1) { reactiveRedisTemplate.scan(any<ScanOptions>()) }
             verify(exactly = 0) { reactiveRedisTemplate.delete(any<Flux<String>>()) }
         }
 
@@ -278,14 +305,14 @@ class FeedCacheServiceTest {
             val user1 = UUID.randomUUID()
             val keys = listOf("feed:rec:$user1:batch:0")
 
-            every { reactiveRedisTemplate.scan(any()) } returns Flux.fromIterable(keys)
+            every { reactiveRedisTemplate.scan(any<ScanOptions>()) } returns Flux.fromIterable(keys)
             every { reactiveRedisTemplate.delete(any<Flux<String>>()) } returns Mono.just(1L)
 
             // When: user1의 캐시만 삭제
             feedCacheService.clearUserCache(user1).block()
 
             // Then: scan과 delete 호출 확인
-            verify(exactly = 1) { reactiveRedisTemplate.scan(any()) }
+            verify(exactly = 1) { reactiveRedisTemplate.scan(any<ScanOptions>()) }
             verify(exactly = 1) { reactiveRedisTemplate.delete(any<Flux<String>>()) }
         }
     }
