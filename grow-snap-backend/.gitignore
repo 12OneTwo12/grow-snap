@@ -41,3 +41,6 @@ out/
 
 ### JOOQ Generated Code ###
 src/main/generated/
+
+### REST Docs Generated HTML ###
+src/main/resources/static/docs/
