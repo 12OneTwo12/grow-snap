@@ -886,6 +886,130 @@ class VideoService {
 
 ## 🎨 코드 작성 규칙
 
+### 로깅 및 출력 규칙
+
+**절대 준수**: 다음 규칙은 예외 없이 반드시 지켜야 합니다.
+
+#### 1. println 사용 금지
+
+- ❌ **절대 사용 금지**: `println()`, `print()`, `System.out.println()` 등 모든 콘솔 출력
+- ✅ **반드시 사용**: SLF4J Logger 사용
+
+```kotlin
+// ❌ BAD: println 사용
+fun startRedis() {
+    redisServer?.start()
+    println("Embedded Redis started on port $redisPort")  // 절대 금지!
+}
+
+// ✅ GOOD: Logger 사용
+@Service
+class RedisService {
+    companion object {
+        private val logger = LoggerFactory.getLogger(RedisService::class.java)
+    }
+
+    fun startRedis() {
+        redisServer?.start()
+        logger.info("Embedded Redis started on port {}", redisPort)
+    }
+}
+```
+
+**이유**:
+- println은 로그 레벨 제어 불가
+- 프로덕션 환경에서 로그 추적 불가능
+- 로그 파일로 저장되지 않음
+- 구조화된 로깅 불가능
+
+#### 2. 이모티콘 사용 금지
+
+- ❌ **절대 사용 금지**: 코드, 주석, 로그 메시지에 이모티콘 사용 금지
+- ✅ **허용**: 문서 파일 (README.md, CLAUDE.md 등)에서만 사용 가능
+
+```kotlin
+// ❌ BAD: 이모티콘 사용
+logger.info("✅ Redis started successfully")
+logger.warn("⚠️ Redis port already in use")
+// 주석에도 이모티콘 사용 금지: // ✅ 성공 케이스
+
+// ✅ GOOD: 텍스트만 사용
+logger.info("Redis started successfully")
+logger.warn("Redis port already in use")
+// 주석도 텍스트만: // 성공 케이스
+```
+
+**이유**:
+- 로그 파일 인코딩 문제 발생 가능
+- 로그 검색 및 파싱 어려움
+- 전문성 저하
+- CI/CD 환경에서 이모티콘 깨질 수 있음
+
+#### 📋 로깅 체크리스트
+
+코드 작성 전 반드시 확인:
+
+- [ ] **println 사용 금지**: `println`, `print`, `System.out.println` 사용하지 않았는가?
+- [ ] **Logger 사용**: SLF4J Logger를 사용했는가?
+- [ ] **이모티콘 제거**: 코드, 주석, 로그에 이모티콘(✅, ⚠️, 🔥 등)이 없는가?
+- [ ] **로그 레벨 적절성**: 적절한 로그 레벨(info, warn, error, debug)을 사용했는가?
+
+#### 3. FQCN 사용 금지
+
+- ❌ **절대 사용 금지**: Fully Qualified Class Name (FQCN) 사용 금지
+- ✅ **반드시 사용**: import 문 사용
+
+```kotlin
+// ❌ BAD: FQCN 사용
+val scanOptions = org.springframework.data.redis.core.ScanOptions.scanOptions()
+    .match(pattern)
+    .build()
+
+return redisTemplate.execute { connection ->
+    connection.scriptingCommands()
+        .eval(
+            ByteBuffer.wrap(script.toByteArray()),
+            org.springframework.data.redis.connection.ReturnType.INTEGER,  // FQCN 사용 금지!
+            1,
+            ByteBuffer.wrap(key.toByteArray())
+        )
+}
+
+// ✅ GOOD: import 사용
+import org.springframework.data.redis.core.ScanOptions
+import org.springframework.data.redis.connection.ReturnType
+
+val scanOptions = ScanOptions.scanOptions()
+    .match(pattern)
+    .build()
+
+return redisTemplate.execute { connection ->
+    connection.scriptingCommands()
+        .eval(
+            ByteBuffer.wrap(script.toByteArray()),
+            ReturnType.INTEGER,  // import한 클래스 사용
+            1,
+            ByteBuffer.wrap(key.toByteArray())
+        )
+}
+```
+
+**이유**:
+- 코드 가독성 저하
+- 네임스페이스 오염
+- IDE의 자동 import 기능 활용 불가
+- 코드 리뷰 및 유지보수 어려움
+
+#### 📋 FQCN 체크리스트
+
+코드 작성 전 반드시 확인:
+
+- [ ] **FQCN 사용 금지**: `package.name.ClassName` 형태로 직접 사용하지 않았는가?
+- [ ] **import 문 사용**: 모든 외부 클래스는 import하여 사용했는가?
+- [ ] **IDE 자동 import**: IDE의 자동 import 기능을 활용했는가?
+
+---
+
 ### 네이밍
 
 ```kotlin
@@ -1179,6 +1303,9 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 11. **RESTful API**: 동사 금지, 적절한 HTTP 메서드/상태 코드
 12. **Audit Trail**: 모든 엔티티에 5가지 필드 필수 (createdAt, createdBy, updatedAt, updatedBy, deletedAt), 물리적 삭제 금지
 13. **Database Query**: SELECT 쿼리에서 asterisk (*) 사용 절대 금지, 필요한 컬럼만 명시적으로 선택
+14. **로깅 규칙**: println 절대 금지, SLF4J Logger 필수 사용
+15. **이모티콘 금지**: 코드, 주석, 로그에 이모티콘 절대 사용 금지 (문서 파일만 허용)
+16. **FQCN 금지**: Fully Qualified Class Name 사용 금지, 반드시 import 문 사용
 
 ---
 

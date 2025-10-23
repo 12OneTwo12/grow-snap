@@ -17,6 +17,7 @@ import me.onetwo.growsnap.jooq.generated.tables.references.USERS
 import me.onetwo.growsnap.jooq.generated.tables.references.USER_PROFILES
 import me.onetwo.growsnap.jooq.generated.tables.references.USER_VIEW_HISTORY
 import org.jooq.DSLContext
+import org.jooq.impl.DSL
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -289,6 +290,192 @@ class FeedRepositoryImpl(
     }
 
     /**
+     * 인기 콘텐츠 ID 목록 조회
+     *
+     * 인터랙션 가중치 기반 인기도 점수가 높은 콘텐츠를 조회합니다.
+     *
+     * ### 인기도 계산 공식
+     * ```
+     * popularity_score = view_count * 1.0
+     *                  + like_count * 5.0
+     *                  + comment_count * 3.0
+     *                  + save_count * 7.0
+     *                  + share_count * 10.0
+     * ```
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 인기 콘텐츠 ID 목록 (인기도 순 정렬)
+     */
+    override fun findPopularContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
+        return Mono.fromCallable {
+            // 인기도 점수 계산식 (부동소수점 연산)
+            val popularityScore = CONTENT_INTERACTIONS.VIEW_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_VIEW)
+                .plus(CONTENT_INTERACTIONS.LIKE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_LIKE))
+                .plus(CONTENT_INTERACTIONS.COMMENT_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_COMMENT))
+                .plus(CONTENT_INTERACTIONS.SAVE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_SAVE))
+                .plus(CONTENT_INTERACTIONS.SHARE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_SHARE))
+
+            var query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_INTERACTIONS).on(CONTENT_INTERACTIONS.CONTENT_ID.eq(CONTENTS.ID))
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+
+            // 제외할 콘텐츠 필터링
+            if (excludeIds.isNotEmpty()) {
+                query = query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            }
+
+            query
+                .orderBy(popularityScore.desc())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
+     * 신규 콘텐츠 ID 목록 조회
+     *
+     * 최근 업로드된 콘텐츠를 조회합니다.
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 신규 콘텐츠 ID 목록 (최신순 정렬)
+     */
+    override fun findNewContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
+        return Mono.fromCallable {
+            var query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+
+            // 제외할 콘텐츠 필터링
+            if (excludeIds.isNotEmpty()) {
+                query = query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            }
+
+            query
+                .orderBy(CONTENTS.CREATED_AT.desc())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
+     * 랜덤 콘텐츠 ID 목록 조회
+     *
+     * 무작위 콘텐츠를 조회하여 다양성을 확보합니다.
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 랜덤 콘텐츠 ID 목록 (무작위 정렬)
+     */
+    override fun findRandomContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID> {
+        return Mono.fromCallable {
+            var query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+
+            // 제외할 콘텐츠 필터링
+            if (excludeIds.isNotEmpty()) {
+                query = query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            }
+
+            query
+                .orderBy(DSL.rand())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
+     * 콘텐츠 ID 목록 기반 상세 정보 조회
+     *
+     * 추천 알고리즘에서 받은 콘텐츠 ID 목록으로 상세 정보를 조회합니다.
+     * ID 목록의 순서를 유지하여 반환합니다.
+     *
+     * @param contentIds 콘텐츠 ID 목록 (순서 유지)
+     * @return 피드 아이템 목록 (입력 순서 유지)
+     */
+    override fun findByContentIds(contentIds: List<UUID>): Flux<FeedItemResponse> {
+        if (contentIds.isEmpty()) {
+            return Flux.empty()
+        }
+
+        return Mono.fromCallable {
+            val records = dslContext
+                .select(
+                    // CONTENTS 필요 컬럼만 명시적으로 선택
+                    CONTENTS.ID,
+                    CONTENTS.CONTENT_TYPE,
+                    CONTENTS.URL,
+                    CONTENTS.THUMBNAIL_URL,
+                    CONTENTS.DURATION,
+                    CONTENTS.WIDTH,
+                    CONTENTS.HEIGHT,
+                    CONTENTS.CREATED_AT,
+                    // CONTENT_METADATA 필요 컬럼만 명시적으로 선택
+                    CONTENT_METADATA.TITLE,
+                    CONTENT_METADATA.DESCRIPTION,
+                    CONTENT_METADATA.CATEGORY,
+                    CONTENT_METADATA.TAGS,
+                    // CONTENT_INTERACTIONS 필요 컬럼만 명시적으로 선택
+                    CONTENT_INTERACTIONS.LIKE_COUNT,
+                    CONTENT_INTERACTIONS.COMMENT_COUNT,
+                    CONTENT_INTERACTIONS.SAVE_COUNT,
+                    CONTENT_INTERACTIONS.SHARE_COUNT,
+                    CONTENT_INTERACTIONS.VIEW_COUNT,
+                    // USERS, USER_PROFILES
+                    USERS.ID,
+                    USER_PROFILES.NICKNAME,
+                    USER_PROFILES.PROFILE_IMAGE_URL,
+                    USER_PROFILES.FOLLOWER_COUNT
+                )
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .join(CONTENT_INTERACTIONS).on(CONTENT_INTERACTIONS.CONTENT_ID.eq(CONTENTS.ID))
+                .join(USERS).on(USERS.ID.eq(CONTENTS.CREATOR_ID))
+                .join(USER_PROFILES).on(USER_PROFILES.USER_ID.eq(USERS.ID))
+                .where(CONTENTS.ID.`in`(contentIds.map { it.toString() }))
+                .and(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+                .and(USERS.DELETED_AT.isNull)
+                .and(USER_PROFILES.DELETED_AT.isNull)
+                .fetch()
+
+            // 자막 배치 조회 (N+1 문제 방지)
+            val subtitlesMap = findSubtitlesByContentIds(contentIds)
+
+            // 레코드를 FeedItemResponse로 변환
+            val feedItemsMap = records
+                .map { record -> mapRecordToFeedItem(record, subtitlesMap) }
+                .associateBy { it.contentId }
+
+            // 입력된 ID 순서대로 정렬하여 반환
+            contentIds.mapNotNull { feedItemsMap[it] }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
      * 여러 콘텐츠의 자막 정보를 배치로 조회 (N+1 문제 방지)
      *
      * @param contentIds 콘텐츠 ID 목록
@@ -318,5 +505,19 @@ class FeedRepositoryImpl(
                     )
                 }
             )
+    }
+
+    companion object {
+        /**
+         * 인기도 점수 계산 가중치
+         *
+         * 각 인터랙션 유형별 가중치를 정의합니다.
+         * 높은 가중치일수록 인기도 점수에 더 큰 영향을 미칩니다.
+         */
+        private const val POPULARITY_WEIGHT_VIEW = 1.0
+        private const val POPULARITY_WEIGHT_LIKE = 5.0
+        private const val POPULARITY_WEIGHT_COMMENT = 3.0
+        private const val POPULARITY_WEIGHT_SAVE = 7.0
+        private const val POPULARITY_WEIGHT_SHARE = 10.0
     }
 }

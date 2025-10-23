@@ -397,6 +397,454 @@ class FeedRepositoryImplTest {
         }
     }
 
+    @Nested
+    @DisplayName("findPopularContentIds - 인기 콘텐츠 ID 조회")
+    inner class FindPopularContentIds {
+
+        @Test
+        @DisplayName("인기도 순으로 콘텐츠 ID를 반환한다")
+        fun findPopularContentIds_ReturnsOrderedByPopularity() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 인기도가 다른 3개의 콘텐츠
+            val highPopularityId = UUID.randomUUID()
+            val mediumPopularityId = UUID.randomUUID()
+            val lowPopularityId = UUID.randomUUID()
+
+            // 고인기: view*1 + like*5 + comment*3 + save*7 + share*10 = 10000 + 5000 + 3000 + 7000 + 10000 = 35000
+            insertContentWithInteractions(highPopularityId, creator1.id!!, "High Popularity", 10000, 1000, 1000, 1000, 1000)
+            // 중인기: 5000 + 2500 + 1500 + 3500 + 5000 = 17500
+            insertContentWithInteractions(mediumPopularityId, creator1.id!!, "Medium Popularity", 5000, 500, 500, 500, 500)
+            // 저인기: 1000 + 500 + 300 + 700 + 1000 = 3500
+            insertContentWithInteractions(lowPopularityId, creator2.id!!, "Low Popularity", 1000, 100, 100, 100, 100)
+
+            // When: 인기 콘텐츠 조회
+            val result = feedRepository.findPopularContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 인기도 순으로 정렬되어 반환
+            assertEquals(3, result.size)
+            assertEquals(highPopularityId, result[0])
+            assertEquals(mediumPopularityId, result[1])
+            assertEquals(lowPopularityId, result[2])
+        }
+
+        @Test
+        @DisplayName("제외할 콘텐츠 ID가 주어지면, 해당 콘텐츠를 제외하고 반환한다")
+        fun findPopularContentIds_WithExcludeIds_ExcludesSpecifiedContent() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 3개의 콘텐츠
+            val id1 = UUID.randomUUID()
+            val id2 = UUID.randomUUID()
+            val id3 = UUID.randomUUID()
+
+            insertContentWithInteractions(id1, creator1.id!!, "Content 1", 3000, 300, 300, 300, 300)
+            insertContentWithInteractions(id2, creator1.id!!, "Content 2", 2000, 200, 200, 200, 200)
+            insertContentWithInteractions(id3, creator2.id!!, "Content 3", 1000, 100, 100, 100, 100)
+
+            // When: id2를 제외하고 조회
+            val result = feedRepository.findPopularContentIds(10, listOf(id2))
+                .collectList()
+                .block()!!
+
+            // Then: id1, id3만 반환 (id2 제외)
+            assertEquals(2, result.size)
+            assertTrue(result.contains(id1))
+            assertFalse(result.contains(id2))
+            assertTrue(result.contains(id3))
+        }
+
+        @Test
+        @DisplayName("limit보다 적은 콘텐츠가 있으면, 있는 만큼만 반환한다")
+        fun findPopularContentIds_WithLimitGreaterThanAvailable_ReturnsAllAvailable() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 2개의 콘텐츠
+            val id1 = UUID.randomUUID()
+            val id2 = UUID.randomUUID()
+
+            insertContentWithInteractions(id1, creator1.id!!, "Content 1", 2000, 200, 200, 200, 200)
+            insertContentWithInteractions(id2, creator1.id!!, "Content 2", 1000, 100, 100, 100, 100)
+
+            // When: limit=10으로 조회 (실제 콘텐츠는 2개)
+            val result = feedRepository.findPopularContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 2개만 반환
+            assertEquals(2, result.size)
+        }
+
+        @Test
+        @DisplayName("삭제된 콘텐츠는 조회되지 않는다")
+        fun findPopularContentIds_ExcludesDeletedContent() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 정상 콘텐츠 1개, 삭제된 콘텐츠 1개
+            val activeId = UUID.randomUUID()
+            val deletedId = UUID.randomUUID()
+
+            insertContentWithInteractions(activeId, creator1.id!!, "Active Content", 2000, 200, 200, 200, 200)
+            insertContentWithInteractions(deletedId, creator1.id!!, "Deleted Content", 3000, 300, 300, 300, 300)
+
+            // 콘텐츠 삭제 (Soft Delete)
+            dslContext.update(CONTENTS)
+                .set(CONTENTS.DELETED_AT, LocalDateTime.now())
+                .where(CONTENTS.ID.eq(deletedId.toString()))
+                .execute()
+
+            // When: 인기 콘텐츠 조회
+            val result = feedRepository.findPopularContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 삭제되지 않은 콘텐츠만 반환
+            assertEquals(1, result.size)
+            assertEquals(activeId, result[0])
+        }
+    }
+
+    @Nested
+    @DisplayName("findNewContentIds - 신규 콘텐츠 ID 조회")
+    inner class FindNewContentIds {
+
+        @Test
+        @DisplayName("최신순으로 콘텐츠 ID를 반환한다")
+        fun findNewContentIds_ReturnsOrderedByCreatedAtDesc() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 생성 시각이 다른 3개의 콘텐츠
+            val now = LocalDateTime.now()
+            val newestId = UUID.randomUUID()
+            val middleId = UUID.randomUUID()
+            val oldestId = UUID.randomUUID()
+
+            insertContent(oldestId, creator1.id!!, "Oldest Content", now.minusDays(3))
+            insertContent(middleId, creator1.id!!, "Middle Content", now.minusDays(2))
+            insertContent(newestId, creator2.id!!, "Newest Content", now.minusDays(1))
+
+            // When: 신규 콘텐츠 조회
+            val result = feedRepository.findNewContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 최신순으로 정렬되어 반환
+            assertEquals(3, result.size)
+            assertEquals(newestId, result[0])
+            assertEquals(middleId, result[1])
+            assertEquals(oldestId, result[2])
+        }
+
+        @Test
+        @DisplayName("제외할 콘텐츠 ID가 주어지면, 해당 콘텐츠를 제외하고 반환한다")
+        fun findNewContentIds_WithExcludeIds_ExcludesSpecifiedContent() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 3개의 콘텐츠
+            val now = LocalDateTime.now()
+            val id1 = UUID.randomUUID()
+            val id2 = UUID.randomUUID()
+            val id3 = UUID.randomUUID()
+
+            insertContent(id1, creator1.id!!, "Content 1", now.minusDays(1))
+            insertContent(id2, creator1.id!!, "Content 2", now.minusDays(2))
+            insertContent(id3, creator2.id!!, "Content 3", now.minusDays(3))
+
+            // When: id2를 제외하고 조회
+            val result = feedRepository.findNewContentIds(10, listOf(id2))
+                .collectList()
+                .block()!!
+
+            // Then: id1, id3만 반환 (id2 제외)
+            assertEquals(2, result.size)
+            assertTrue(result.contains(id1))
+            assertFalse(result.contains(id2))
+            assertTrue(result.contains(id3))
+        }
+
+        @Test
+        @DisplayName("limit만큼만 콘텐츠를 반환한다")
+        fun findNewContentIds_ReturnsUpToLimit() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 5개의 콘텐츠
+            val now = LocalDateTime.now()
+            repeat(5) { index ->
+                insertContent(UUID.randomUUID(), creator1.id!!, "Content $index", now.minusDays(index.toLong()))
+            }
+
+            // When: limit=3으로 조회
+            val result = feedRepository.findNewContentIds(3, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 3개만 반환
+            assertEquals(3, result.size)
+        }
+
+        @Test
+        @DisplayName("삭제된 콘텐츠는 조회되지 않는다")
+        fun findNewContentIds_ExcludesDeletedContent() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 정상 콘텐츠 1개, 삭제된 콘텐츠 1개
+            val now = LocalDateTime.now()
+            val activeId = UUID.randomUUID()
+            val deletedId = UUID.randomUUID()
+
+            insertContent(activeId, creator1.id!!, "Active Content", now.minusDays(1))
+            insertContent(deletedId, creator1.id!!, "Deleted Content", now)
+
+            // 콘텐츠 삭제 (Soft Delete)
+            dslContext.update(CONTENTS)
+                .set(CONTENTS.DELETED_AT, LocalDateTime.now())
+                .where(CONTENTS.ID.eq(deletedId.toString()))
+                .execute()
+
+            // When: 신규 콘텐츠 조회
+            val result = feedRepository.findNewContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 삭제되지 않은 콘텐츠만 반환
+            assertEquals(1, result.size)
+            assertEquals(activeId, result[0])
+        }
+    }
+
+    @Nested
+    @DisplayName("findRandomContentIds - 랜덤 콘텐츠 ID 조회")
+    inner class FindRandomContentIds {
+
+        @Test
+        @DisplayName("랜덤 순서로 콘텐츠 ID를 반환한다")
+        fun findRandomContentIds_ReturnsRandomOrder() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 여러 개의 콘텐츠
+            val contentIds = (1..10).map { UUID.randomUUID() }
+            contentIds.forEach { id ->
+                insertContent(id, creator1.id!!, "Content $id", LocalDateTime.now())
+            }
+
+            // When: 랜덤 콘텐츠 조회 (여러 번 실행하여 순서가 다른지 확인)
+            val result1 = feedRepository.findRandomContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            val result2 = feedRepository.findRandomContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 같은 콘텐츠들이 반환되지만, 순서는 다를 수 있음 (랜덤이므로 항상 다르지는 않을 수 있음)
+            assertEquals(10, result1.size)
+            assertEquals(10, result2.size)
+            // 모든 ID가 포함되어 있는지 확인
+            assertTrue(contentIds.all { result1.contains(it) })
+            assertTrue(contentIds.all { result2.contains(it) })
+        }
+
+        @Test
+        @DisplayName("제외할 콘텐츠 ID가 주어지면, 해당 콘텐츠를 제외하고 반환한다")
+        fun findRandomContentIds_WithExcludeIds_ExcludesSpecifiedContent() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 5개의 콘텐츠
+            val ids = (1..5).map { UUID.randomUUID() }
+            ids.forEach { id ->
+                insertContent(id, creator1.id!!, "Content $id", LocalDateTime.now())
+            }
+
+            // When: ids[2]를 제외하고 조회
+            val result = feedRepository.findRandomContentIds(10, listOf(ids[2]))
+                .collectList()
+                .block()!!
+
+            // Then: 4개만 반환 (ids[2] 제외)
+            assertEquals(4, result.size)
+            assertFalse(result.contains(ids[2]))
+        }
+
+        @Test
+        @DisplayName("limit만큼만 콘텐츠를 반환한다")
+        fun findRandomContentIds_ReturnsUpToLimit() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 10개의 콘텐츠
+            repeat(10) { index ->
+                insertContent(UUID.randomUUID(), creator1.id!!, "Content $index", LocalDateTime.now())
+            }
+
+            // When: limit=5로 조회
+            val result = feedRepository.findRandomContentIds(5, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 5개만 반환
+            assertEquals(5, result.size)
+        }
+
+        @Test
+        @DisplayName("삭제된 콘텐츠는 조회되지 않는다")
+        fun findRandomContentIds_ExcludesDeletedContent() {
+            // Given: setUp()의 기존 콘텐츠 삭제
+            dslContext.deleteFrom(CONTENT_INTERACTIONS).execute()
+            dslContext.deleteFrom(CONTENT_METADATA).execute()
+            dslContext.deleteFrom(CONTENTS).execute()
+
+            // Given: 정상 콘텐츠 3개, 삭제된 콘텐츠 1개
+            val activeIds = (1..3).map { UUID.randomUUID() }
+            val deletedId = UUID.randomUUID()
+
+            activeIds.forEach { id ->
+                insertContent(id, creator1.id!!, "Active Content $id", LocalDateTime.now())
+            }
+            insertContent(deletedId, creator1.id!!, "Deleted Content", LocalDateTime.now())
+
+            // 콘텐츠 삭제 (Soft Delete)
+            dslContext.update(CONTENTS)
+                .set(CONTENTS.DELETED_AT, LocalDateTime.now())
+                .where(CONTENTS.ID.eq(deletedId.toString()))
+                .execute()
+
+            // When: 랜덤 콘텐츠 조회
+            val result = feedRepository.findRandomContentIds(10, emptyList())
+                .collectList()
+                .block()!!
+
+            // Then: 삭제되지 않은 콘텐츠만 반환
+            assertEquals(3, result.size)
+            assertFalse(result.contains(deletedId))
+        }
+    }
+
+    /**
+     * 인터랙션 카운트 데이터 클래스
+     *
+     * Long Parameter List를 해결하기 위한 데이터 클래스
+     */
+    private data class InteractionCounts(
+        val viewCount: Int = 0,
+        val likeCount: Int = 0,
+        val commentCount: Int = 0,
+        val saveCount: Int = 0,
+        val shareCount: Int = 0
+    )
+
+    /**
+     * 콘텐츠 + 인터랙션 정보 삽입 헬퍼 메서드 (오버로드 - 하위 호환성 유지)
+     */
+    private fun insertContentWithInteractions(
+        contentId: UUID,
+        creatorId: UUID,
+        title: String,
+        viewCount: Int,
+        likeCount: Int,
+        commentCount: Int,
+        saveCount: Int,
+        shareCount: Int,
+        createdAt: LocalDateTime = LocalDateTime.now()
+    ) {
+        insertContentWithInteractions(
+            contentId,
+            creatorId,
+            title,
+            InteractionCounts(viewCount, likeCount, commentCount, saveCount, shareCount),
+            createdAt
+        )
+    }
+
+    /**
+     * 콘텐츠 + 인터랙션 정보 삽입 헬퍼 메서드 (새 버전 - 파라미터 간소화)
+     */
+    private fun insertContentWithInteractions(
+        contentId: UUID,
+        creatorId: UUID,
+        title: String,
+        interactions: InteractionCounts,
+        createdAt: LocalDateTime = LocalDateTime.now()
+    ) {
+        // Contents 테이블
+        dslContext.insertInto(CONTENTS)
+            .set(CONTENTS.ID, contentId.toString())
+            .set(CONTENTS.CREATOR_ID, creatorId.toString())
+            .set(CONTENTS.CONTENT_TYPE, ContentType.VIDEO.name)
+            .set(CONTENTS.URL, "https://example.com/$contentId.mp4")
+            .set(CONTENTS.THUMBNAIL_URL, "https://example.com/$contentId-thumb.jpg")
+            .set(CONTENTS.DURATION, 60)
+            .set(CONTENTS.WIDTH, 1920)
+            .set(CONTENTS.HEIGHT, 1080)
+            .set(CONTENTS.STATUS, ContentStatus.PUBLISHED.name)
+            .set(CONTENTS.CREATED_AT, createdAt)
+            .set(CONTENTS.CREATED_BY, creatorId.toString())
+            .set(CONTENTS.UPDATED_AT, createdAt)
+            .set(CONTENTS.UPDATED_BY, creatorId.toString())
+            .execute()
+
+        // Content_Metadata 테이블
+        dslContext.insertInto(CONTENT_METADATA)
+            .set(CONTENT_METADATA.CONTENT_ID, contentId.toString())
+            .set(CONTENT_METADATA.TITLE, title)
+            .set(CONTENT_METADATA.DESCRIPTION, "Test Description")
+            .set(CONTENT_METADATA.CATEGORY, Category.PROGRAMMING.name)
+            .set(CONTENT_METADATA.TAGS, JSON.valueOf("[\"test\", \"video\"]"))
+            .set(CONTENT_METADATA.LANGUAGE, "ko")
+            .set(CONTENT_METADATA.CREATED_AT, createdAt)
+            .set(CONTENT_METADATA.CREATED_BY, creatorId.toString())
+            .set(CONTENT_METADATA.UPDATED_AT, createdAt)
+            .set(CONTENT_METADATA.UPDATED_BY, creatorId.toString())
+            .execute()
+
+        // Content_Interactions 테이블 (커스텀 인터랙션 수)
+        dslContext.insertInto(CONTENT_INTERACTIONS)
+            .set(CONTENT_INTERACTIONS.CONTENT_ID, contentId.toString())
+            .set(CONTENT_INTERACTIONS.VIEW_COUNT, interactions.viewCount)
+            .set(CONTENT_INTERACTIONS.LIKE_COUNT, interactions.likeCount)
+            .set(CONTENT_INTERACTIONS.COMMENT_COUNT, interactions.commentCount)
+            .set(CONTENT_INTERACTIONS.SAVE_COUNT, interactions.saveCount)
+            .set(CONTENT_INTERACTIONS.SHARE_COUNT, interactions.shareCount)
+            .set(CONTENT_INTERACTIONS.CREATED_AT, createdAt)
+            .set(CONTENT_INTERACTIONS.CREATED_BY, creatorId.toString())
+            .set(CONTENT_INTERACTIONS.UPDATED_AT, createdAt)
+            .set(CONTENT_INTERACTIONS.UPDATED_BY, creatorId.toString())
+            .execute()
+    }
+
     /**
      * 콘텐츠 삽입 헬퍼 메서드
      */

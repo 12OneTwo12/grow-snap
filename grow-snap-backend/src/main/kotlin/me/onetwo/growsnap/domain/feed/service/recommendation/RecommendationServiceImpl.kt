@@ -1,5 +1,6 @@
 package me.onetwo.growsnap.domain.feed.service.recommendation
 
+import me.onetwo.growsnap.domain.feed.repository.FeedRepository
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -9,15 +10,17 @@ import java.util.UUID
  * 추천 서비스 구현체
  *
  * 요구사항 명세서 섹션 2.2.1의 추천 알고리즘을 구현합니다.
- * - 협업 추천 (40%): 유사 사용자 기반 (향후 구현)
+ * - 협업 추천 (40%): 유사 사용자 기반 (Phase 2에서 구현, 현재는 인기 콘텐츠로 대체)
  * - 인기 콘텐츠 (30%): 높은 인터랙션
  * - 신규 콘텐츠 (10%): 최근 업로드
  * - 랜덤 콘텐츠 (20%): 다양성 확보
  *
- * See #32: 실제 추천 알고리즘 구현 예정
+ * @property feedRepository 피드 데이터 조회를 위한 레포지토리
  */
 @Service
-class RecommendationServiceImpl : RecommendationService {
+class RecommendationServiceImpl(
+    private val feedRepository: FeedRepository
+) : RecommendationService {
 
     /**
      * 추천 콘텐츠 ID 목록 조회
@@ -61,19 +64,24 @@ class RecommendationServiceImpl : RecommendationService {
     /**
      * 협업 추천 콘텐츠 ID 조회
      *
-     * 현재는 인기 콘텐츠로 대체 (향후 협업 필터링 구현 예정)
+     * **Phase 2 구현 예정**: 현재는 인기 콘텐츠로 대체
+     *
+     * ### 향후 구현 계획
+     * - 유사 사용자 찾기 (코사인 유사도)
+     * - Matrix Factorization
+     * - Neural Collaborative Filtering
      *
      * @param userId 사용자 ID
      * @param limit 조회할 콘텐츠 수
      * @param excludeContentIds 제외할 콘텐츠 ID 목록
-     * @return 협업 추천 콘텐츠 ID 목록
+     * @return 협업 추천 콘텐츠 ID 목록 (현재는 인기 콘텐츠)
      */
     private fun getCollaborativeContentIds(
         userId: UUID,
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // See #32: 협업 필터링 알고리즘 구현 예정
+        // Phase 2: 협업 필터링 알고리즘 구현 예정
         // 현재는 인기 콘텐츠로 대체
         return getPopularContentIds(limit, excludeContentIds)
     }
@@ -81,19 +89,26 @@ class RecommendationServiceImpl : RecommendationService {
     /**
      * 인기 콘텐츠 ID 조회
      *
-     * 조회수, 좋아요 등 인터랙션이 많은 콘텐츠를 조회합니다.
+     * 인터랙션 가중치 기반 인기도 점수가 높은 콘텐츠를 조회합니다.
+     *
+     * ### 인기도 계산 공식
+     * ```
+     * popularity_score = view_count * 1.0
+     *                  + like_count * 5.0
+     *                  + comment_count * 3.0
+     *                  + save_count * 7.0
+     *                  + share_count * 10.0
+     * ```
      *
      * @param limit 조회할 콘텐츠 수
      * @param excludeContentIds 제외할 콘텐츠 ID 목록
-     * @return 인기 콘텐츠 ID 목록
+     * @return 인기 콘텐츠 ID 목록 (인기도 순 정렬)
      */
     private fun getPopularContentIds(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // See #32: 인기 콘텐츠 조회 Repository 메서드 구현 예정
-        // return feedRepository.findPopularContentIds(limit, excludeContentIds)
-        return Flux.empty()
+        return feedRepository.findPopularContentIds(limit, excludeContentIds)
     }
 
     /**
@@ -103,32 +118,28 @@ class RecommendationServiceImpl : RecommendationService {
      *
      * @param limit 조회할 콘텐츠 수
      * @param excludeContentIds 제외할 콘텐츠 ID 목록
-     * @return 신규 콘텐츠 ID 목록
+     * @return 신규 콘텐츠 ID 목록 (최신순 정렬)
      */
     private fun getNewContentIds(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // See #32: 신규 콘텐츠 조회 Repository 메서드 구현 예정
-        // return feedRepository.findNewContentIds(limit, excludeContentIds)
-        return Flux.empty()
+        return feedRepository.findNewContentIds(limit, excludeContentIds)
     }
 
     /**
      * 랜덤 콘텐츠 ID 조회
      *
-     * 무작위 콘텐츠를 조회합니다.
+     * 무작위 콘텐츠를 조회하여 다양성을 확보합니다.
      *
      * @param limit 조회할 콘텐츠 수
      * @param excludeContentIds 제외할 콘텐츠 ID 목록
-     * @return 랜덤 콘텐츠 ID 목록
+     * @return 랜덤 콘텐츠 ID 목록 (무작위 정렬)
      */
     private fun getRandomContentIds(
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // See #32: 랜덤 콘텐츠 조회 Repository 메서드 구현 예정
-        // return feedRepository.findRandomContentIds(limit, excludeContentIds)
-        return Flux.empty()
+        return feedRepository.findRandomContentIds(limit, excludeContentIds)
     }
 }

@@ -55,4 +55,57 @@ interface FeedRepository {
      * @return 최근 본 콘텐츠 ID 목록
      */
     fun findRecentlyViewedContentIds(userId: UUID, limit: Int): Flux<UUID>
+
+    /**
+     * 인기 콘텐츠 ID 목록 조회
+     *
+     * 인터랙션 가중치 기반 인기도 점수가 높은 콘텐츠를 조회합니다.
+     *
+     * ### 인기도 계산 공식
+     * ```
+     * popularity_score = view_count * 1.0
+     *                  + like_count * 5.0
+     *                  + comment_count * 3.0
+     *                  + save_count * 7.0
+     *                  + share_count * 10.0
+     * ```
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 인기 콘텐츠 ID 목록 (인기도 순 정렬)
+     */
+    fun findPopularContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID>
+
+    /**
+     * 신규 콘텐츠 ID 목록 조회
+     *
+     * 최근 업로드된 콘텐츠를 조회합니다.
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 신규 콘텐츠 ID 목록 (최신순 정렬)
+     */
+    fun findNewContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID>
+
+    /**
+     * 랜덤 콘텐츠 ID 목록 조회
+     *
+     * 무작위 콘텐츠를 조회하여 다양성을 확보합니다.
+     *
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 랜덤 콘텐츠 ID 목록 (무작위 정렬)
+     */
+    fun findRandomContentIds(limit: Int, excludeIds: List<UUID>): Flux<UUID>
+
+    /**
+     * 콘텐츠 ID 목록 기반 상세 정보 조회
+     *
+     * 추천 알고리즘에서 받은 콘텐츠 ID 목록으로 상세 정보를 조회합니다.
+     * ID 목록의 순서를 유지하여 반환합니다.
+     *
+     * @param contentIds 콘텐츠 ID 목록 (순서 유지)
+     * @return 피드 아이템 목록 (입력 순서 유지)
+     */
+    fun findByContentIds(contentIds: List<UUID>): Flux<FeedItemResponse>
 }

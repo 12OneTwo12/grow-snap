@@ -48,6 +48,9 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.12")
     testImplementation("com.ninja-squad:springmockk:4.0.2")
 
+    // Embedded Redis for testing
+    testImplementation("com.github.kstyrc:embedded-redis:0.6")
+
     // OAuth2 Client
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 
@@ -114,6 +117,10 @@ tasks.register<Copy>("buildDocument") {
     dependsOn("copyDocument")
     from(file("src/main/resources/static/docs"))
     into(file("build/resources/main/static/docs"))
+}
+
+tasks.named("jar") {
+    dependsOn("buildDocument")
 }
 
 tasks.named("bootJar") {
