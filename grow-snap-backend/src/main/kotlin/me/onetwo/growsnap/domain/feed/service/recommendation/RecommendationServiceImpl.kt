@@ -1,6 +1,8 @@
 package me.onetwo.growsnap.domain.feed.service.recommendation
 
 import me.onetwo.growsnap.domain.feed.repository.FeedRepository
+import me.onetwo.growsnap.domain.feed.service.collaborative.CollaborativeFilteringService
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -10,16 +12,18 @@ import java.util.UUID
  * 추천 서비스 구현체
  *
  * 요구사항 명세서 섹션 2.2.1의 추천 알고리즘을 구현합니다.
- * - 협업 추천 (40%): 유사 사용자 기반 (Phase 2에서 구현, 현재는 인기 콘텐츠로 대체)
+ * - 협업 필터링 (40%): Item-based Collaborative Filtering
  * - 인기 콘텐츠 (30%): 높은 인터랙션
  * - 신규 콘텐츠 (10%): 최근 업로드
  * - 랜덤 콘텐츠 (20%): 다양성 확보
  *
  * @property feedRepository 피드 데이터 조회를 위한 레포지토리
+ * @property collaborativeFilteringService Item-based 협업 필터링 서비스
  */
 @Service
 class RecommendationServiceImpl(
-    private val feedRepository: FeedRepository
+    private val feedRepository: FeedRepository,
+    private val collaborativeFilteringService: CollaborativeFilteringService
 ) : RecommendationService {
 
     /**
@@ -62,28 +66,67 @@ class RecommendationServiceImpl(
     }
 
     /**
-     * 협업 추천 콘텐츠 ID 조회
+     * 협업 필터링 콘텐츠 ID 조회
      *
-     * **Phase 2 구현 예정**: 현재는 인기 콘텐츠로 대체
+     * **Item-based Collaborative Filtering (Issue #10)**
      *
-     * ### 향후 구현 계획
-     * - 유사 사용자 찾기 (코사인 유사도)
+     * "이 콘텐츠를 좋아한 사람들은 이것도 좋아했습니다"
+     *
+     * ### 처리 흐름
+     * 1. Item-based CF 알고리즘으로 추천 콘텐츠 조회
+     *    - 내가 좋아요/저장/공유한 콘텐츠 조회 (seed items)
+     *    - 각 seed item을 좋아한 다른 사용자 찾기
+     *    - 그 사용자들이 좋아한 다른 콘텐츠 추천
+     * 2. 추천 결과가 없으면 (신규 사용자) 인기 콘텐츠로 fallback
+     * 3. 추천 결과가 부족하면 인기 콘텐츠로 보충
+     *
+     * ### Best Practice 근거
+     * - Netflix, YouTube, TikTok 등이 사용하는 방식
+     * - User-based CF보다 확장성과 성능이 우수
+     * - 실시간 계산 가능 (배치 처리 불필요)
+     *
+     * ### 향후 개선 계획 (Phase 2)
+     * - Cosine Similarity / Jaccard Similarity 적용
      * - Matrix Factorization
      * - Neural Collaborative Filtering
      *
      * @param userId 사용자 ID
      * @param limit 조회할 콘텐츠 수
      * @param excludeContentIds 제외할 콘텐츠 ID 목록
-     * @return 협업 추천 콘텐츠 ID 목록 (현재는 인기 콘텐츠)
+     * @return 협업 필터링 추천 콘텐츠 ID 목록
      */
     private fun getCollaborativeContentIds(
         userId: UUID,
         limit: Int,
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
-        // Phase 2: 협업 필터링 알고리즘 구현 예정
-        // 현재는 인기 콘텐츠로 대체
-        return getPopularContentIds(limit, excludeContentIds)
+        return collaborativeFilteringService.getRecommendedContents(userId, limit)
+            .filter { !excludeContentIds.contains(it) }  // 제외 목록 필터링
+            .collectList()
+            .flatMapMany { recommendedIds ->
+                if (recommendedIds.isEmpty()) {
+                    // CF 추천 결과가 없으면 (신규 사용자) 인기 콘텐츠로 fallback
+                    logger.debug("No CF recommendations for user {}, falling back to popular content", userId)
+                    getPopularContentIds(limit, excludeContentIds)
+                } else if (recommendedIds.size < limit) {
+                    // CF 추천 결과가 부족하면 인기 콘텐츠로 보충
+                    val remaining = limit - recommendedIds.size
+                    logger.debug(
+                        "CF recommendations ({}) < limit ({}), adding {} popular contents",
+                        recommendedIds.size,
+                        limit,
+                        remaining
+                    )
+                    Flux.concat(
+                        Flux.fromIterable(recommendedIds),
+                        getPopularContentIds(remaining, excludeContentIds + recommendedIds)
+                    )
+                } else {
+                    // CF 추천 결과가 충분함
+                    logger.debug("Returning {} CF recommendations for user {}", recommendedIds.size, userId)
+                    Flux.fromIterable(recommendedIds.take(limit))
+                }
+            }
     }
 
     /**
@@ -141,5 +184,9 @@ class RecommendationServiceImpl(
         excludeContentIds: List<UUID>
     ): Flux<UUID> {
         return feedRepository.findRandomContentIds(limit, excludeContentIds)
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(RecommendationServiceImpl::class.java)
     }
 }

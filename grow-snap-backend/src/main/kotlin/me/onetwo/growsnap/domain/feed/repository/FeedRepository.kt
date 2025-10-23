@@ -108,4 +108,26 @@ interface FeedRepository {
      * @return 피드 아이템 목록 (입력 순서 유지)
      */
     fun findByContentIds(contentIds: List<UUID>): Flux<FeedItemResponse>
+
+    /**
+     * 콘텐츠 ID 목록의 카테고리 조회 (사용자 선호도 분석용)
+     *
+     * @param contentIds 콘텐츠 ID 목록
+     * @return 카테고리 목록 (중복 포함)
+     */
+    fun findCategoriesByContentIds(contentIds: List<UUID>): Flux<String>
+
+    /**
+     * 특정 카테고리의 인기 콘텐츠 ID 조회 (카테고리 기반 추천용)
+     *
+     * @param categories 카테고리 목록
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 인기 콘텐츠 ID 목록 (인기도 순 정렬)
+     */
+    fun findPopularContentIdsByCategories(
+        categories: List<String>,
+        limit: Int,
+        excludeIds: List<UUID>
+    ): Flux<UUID>
 }

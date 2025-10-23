@@ -191,6 +191,58 @@ grow-snap-backend/
 - ❌ 데이터베이스 접근 금지
 - ❌ 복잡한 데이터 처리 금지 (FilePart 처리, 파일 변환 등)
 
+##### @AuthenticationPrincipal 사용 규칙 (Spring Security 인증/인가)
+
+**원칙**: userId를 파라미터로 받아야 한다면 Spring Security Context에서 `@AuthenticationPrincipal`로 추출해야 합니다.
+
+**중요**: 이 프로젝트는 Spring Security를 사용하여 인증/인가를 처리합니다. 사용자 ID는 JWT 토큰에서 추출되어 Spring Security Context에 저장됩니다.
+
+#### ✅ GOOD: @AuthenticationPrincipal 사용
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/analytics")
+class AnalyticsController(
+    private val analyticsService: AnalyticsService
+) {
+    @PostMapping("/views")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun trackViewEvent(
+        @AuthenticationPrincipal userId: UUID,  // ✅ Spring Security Context에서 추출
+        @Valid @RequestBody request: ViewEventRequest
+    ): Mono<Void> {
+        return analyticsService.trackViewEvent(userId, request)
+    }
+}
+```
+
+#### ❌ BAD: Request Body나 Path Variable로 userId 받기
+
+```kotlin
+// ❌ BAD: userId를 Request Body에서 받음 (보안 취약)
+@PostMapping("/views")
+fun trackViewEvent(
+    @RequestBody request: ViewEventRequest  // userId가 request 안에 포함
+): Mono<Void> {
+    return analyticsService.trackViewEvent(request.userId, request)
+}
+
+// ❌ BAD: userId를 Path Variable로 받음 (변조 가능)
+@PostMapping("/users/{userId}/views")
+fun trackViewEvent(
+    @PathVariable userId: UUID,  // 클라이언트가 임의로 변경 가능
+    @RequestBody request: ViewEventRequest
+): Mono<Void> {
+    return analyticsService.trackViewEvent(userId, request)
+}
+```
+
+#### 📋 @AuthenticationPrincipal 체크리스트
+
+- [ ] **userId는 @AuthenticationPrincipal로 추출**: Request Body나 Path Variable로 받지 않기
+- [ ] **JWT 토큰 검증 의존**: Spring Security가 토큰을 검증한 후 userId 제공
+- [ ] **보안 우선**: 클라이언트가 userId를 임의로 변경할 수 없도록 설계
+
 #### Service (서비스)
 
 **역할**: 비즈니스 로직 처리
@@ -537,6 +589,246 @@ class VideoServiceImplTest {
     }
 }
 ```
+
+### Repository 테스트 템플릿
+
+**중요**: Repository는 반드시 **통합 테스트 (Integration Test)** 로 작성합니다.
+
+**Why Integration Test?**
+- Repository는 실제 데이터베이스와 상호작용하는 계층
+- 단위 테스트로는 JOOQ 쿼리, SQL 문법, 데이터베이스 제약조건을 검증할 수 없음
+- H2 In-Memory DB를 사용하여 실제 데이터베이스 동작을 검증
+- 트랜잭션 격리, Soft Delete, Audit Trail 등 데이터베이스 레벨 기능 검증 필요
+
+```kotlin
+@SpringBootTest
+@ActiveProfiles("test")
+@Transactional
+@DisplayName("콘텐츠 인터랙션 Repository 통합 테스트")
+class ContentInteractionRepositoryTest {
+
+    @Autowired
+    private lateinit var contentInteractionRepository: ContentInteractionRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var dslContext: DSLContext
+
+    private lateinit var testUser: User
+    private lateinit var testContentId: UUID
+
+    @BeforeEach
+    fun setUp() {
+        // Given: 테스트 데이터 준비
+
+        // 사용자 생성
+        testUser = userRepository.save(
+            User(
+                email = "creator@test.com",
+                provider = OAuthProvider.GOOGLE,
+                providerId = "creator-123",
+                role = UserRole.USER
+            )
+        )
+
+        // 콘텐츠 생성
+        testContentId = UUID.randomUUID()
+        insertContent(testContentId, testUser.id!!, "Test Video")
+    }
+
+    @Nested
+    @DisplayName("incrementViewCount - 조회수 증가")
+    inner class IncrementViewCount {
+
+        @Test
+        @DisplayName("조회수를 1 증가시킨다")
+        fun incrementViewCount_IncreasesCountByOne() {
+            // Given: 초기 조회수 확인
+            val initialCount = getViewCount(testContentId)
+
+            // When: 조회수 증가
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+
+            // Then: 1 증가 확인
+            val updatedCount = getViewCount(testContentId)
+            assertEquals(initialCount + 1, updatedCount)
+        }
+
+        @Test
+        @DisplayName("여러 번 증가 시, 누적된다")
+        fun incrementViewCount_MultipleTimes_Accumulates() {
+            // Given: 초기 조회수 확인
+            val initialCount = getViewCount(testContentId)
+
+            // When: 3번 증가
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+
+            // Then: 3 증가 확인
+            val updatedCount = getViewCount(testContentId)
+            assertEquals(initialCount + 3, updatedCount)
+        }
+
+        @Test
+        @DisplayName("삭제된 콘텐츠는 업데이트되지 않는다")
+        fun incrementViewCount_DeletedContent_DoesNotUpdate() {
+            // Given: 콘텐츠 삭제 (Soft Delete)
+            dslContext.update(CONTENT_INTERACTIONS)
+                .set(CONTENT_INTERACTIONS.DELETED_AT, LocalDateTime.now())
+                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(testContentId.toString()))
+                .execute()
+
+            val initialCount = getViewCount(testContentId)
+
+            // When: 조회수 증가 시도
+            contentInteractionRepository.incrementViewCount(testContentId).block()
+
+            // Then: 변경 없음
+            val updatedCount = getViewCount(testContentId)
+            assertEquals(initialCount, updatedCount)
+        }
+    }
+
+    /**
+     * 콘텐츠 삽입 헬퍼 메서드
+     */
+    private fun insertContent(
+        contentId: UUID,
+        creatorId: UUID,
+        title: String
+    ) {
+        val now = LocalDateTime.now()
+
+        // Contents 테이블
+        dslContext.insertInto(CONTENTS)
+            .set(CONTENTS.ID, contentId.toString())
+            .set(CONTENTS.CREATOR_ID, creatorId.toString())
+            .set(CONTENTS.CONTENT_TYPE, ContentType.VIDEO.name)
+            .set(CONTENTS.URL, "https://example.com/$contentId.mp4")
+            .set(CONTENTS.THUMBNAIL_URL, "https://example.com/$contentId-thumb.jpg")
+            .set(CONTENTS.DURATION, 60)
+            .set(CONTENTS.WIDTH, 1920)
+            .set(CONTENTS.HEIGHT, 1080)
+            .set(CONTENTS.STATUS, ContentStatus.PUBLISHED.name)
+            .set(CONTENTS.CREATED_AT, now)
+            .set(CONTENTS.CREATED_BY, creatorId.toString())
+            .set(CONTENTS.UPDATED_AT, now)
+            .set(CONTENTS.UPDATED_BY, creatorId.toString())
+            .execute()
+
+        // Content_Metadata 테이블
+        dslContext.insertInto(CONTENT_METADATA)
+            .set(CONTENT_METADATA.CONTENT_ID, contentId.toString())
+            .set(CONTENT_METADATA.TITLE, title)
+            .set(CONTENT_METADATA.DESCRIPTION, "Test Description")
+            .set(CONTENT_METADATA.CATEGORY, Category.PROGRAMMING.name)
+            .set(CONTENT_METADATA.TAGS, JSON.valueOf("[\"test\"]"))
+            .set(CONTENT_METADATA.LANGUAGE, "ko")
+            .set(CONTENT_METADATA.CREATED_AT, now)
+            .set(CONTENT_METADATA.CREATED_BY, creatorId.toString())
+            .set(CONTENT_METADATA.UPDATED_AT, now)
+            .set(CONTENT_METADATA.UPDATED_BY, creatorId.toString())
+            .execute()
+
+        // Content_Interactions 테이블 (초기값 0)
+        dslContext.insertInto(CONTENT_INTERACTIONS)
+            .set(CONTENT_INTERACTIONS.CONTENT_ID, contentId.toString())
+            .set(CONTENT_INTERACTIONS.VIEW_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.LIKE_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.COMMENT_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.SAVE_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.SHARE_COUNT, 0)
+            .set(CONTENT_INTERACTIONS.CREATED_AT, now)
+            .set(CONTENT_INTERACTIONS.CREATED_BY, creatorId.toString())
+            .set(CONTENT_INTERACTIONS.UPDATED_AT, now)
+            .set(CONTENT_INTERACTIONS.UPDATED_BY, creatorId.toString())
+            .execute()
+    }
+
+    /**
+     * 조회수 조회 헬퍼 메서드
+     */
+    private fun getViewCount(contentId: UUID): Int {
+        return dslContext.select(CONTENT_INTERACTIONS.VIEW_COUNT)
+            .from(CONTENT_INTERACTIONS)
+            .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
+            .fetchOne(CONTENT_INTERACTIONS.VIEW_COUNT) ?: 0
+    }
+}
+```
+
+#### Repository 테스트 핵심 원칙
+
+**1. 통합 테스트 필수 (Integration Test Required)**
+```kotlin
+@SpringBootTest          // ✅ Spring 컨텍스트 로드 (H2 DB 포함)
+@ActiveProfiles("test")  // ✅ application-test.yml 사용
+@Transactional           // ✅ 각 테스트 후 자동 롤백 (테스트 격리)
+```
+
+**2. 실제 데이터베이스 검증**
+- DSLContext를 사용하여 실제 데이터베이스 상태 확인
+- JOOQ 쿼리가 올바르게 실행되는지 검증
+- Soft Delete, Audit Trail 등 데이터베이스 레벨 패턴 검증
+
+**3. 헬퍼 메서드 활용**
+```kotlin
+// ✅ 테스트 데이터 삽입 헬퍼 메서드
+private fun insertContent(contentId: UUID, creatorId: UUID, title: String) { /* ... */ }
+
+// ✅ 데이터베이스 상태 확인 헬퍼 메서드
+private fun getViewCount(contentId: UUID): Int { /* ... */ }
+```
+
+**4. Given-When-Then 패턴**
+```kotlin
+// Given: 테스트 데이터 준비 (BeforeEach 또는 테스트 메서드 내)
+val initialCount = getViewCount(testContentId)
+
+// When: Repository 메서드 실행
+contentInteractionRepository.incrementViewCount(testContentId).block()
+
+// Then: 데이터베이스 상태 검증
+val updatedCount = getViewCount(testContentId)
+assertEquals(initialCount + 1, updatedCount)
+```
+
+**5. Reactive 타입 처리**
+```kotlin
+// ✅ Mono/Flux는 .block() 또는 StepVerifier로 테스트
+repository.save(entity).block()
+
+// ✅ Flux는 .collectList().block()으로 변환
+val results = repository.findAll().collectList().block()!!
+assertEquals(3, results.size)
+```
+
+#### Repository 테스트 체크리스트
+
+**모든 Repository는 반드시 다음을 테스트해야 합니다:**
+
+- [ ] **CRUD 기본 동작**: save, findById, update, delete
+- [ ] **조회 조건**: where 절, 정렬, 페이징, limit
+- [ ] **Soft Delete**: deleted_at이 null인 데이터만 조회되는지 검증
+- [ ] **Audit Trail**: created_at, created_by, updated_at, updated_by 자동 설정 검증
+- [ ] **엣지 케이스**: 데이터 없을 때, 중복 데이터, null 값 처리
+- [ ] **트랜잭션 격리**: 각 테스트가 독립적으로 실행되는지 확인 (@Transactional)
+
+---
+
+### ⚠️ 테스트 작성 필수 계층
+
+**모든 기능 구현 시, 다음 3가지 계층의 테스트를 반드시 작성합니다:**
+
+1. **Controller 테스트** - HTTP 요청/응답, Validation, REST Docs
+2. **Service 테스트** - 비즈니스 로직, 예외 처리, 트랜잭션
+3. **Repository 테스트** - 데이터베이스 CRUD, 쿼리, Soft Delete, Audit Trail
+
+**❌ Controller + Service 테스트만 작성하고 Repository 테스트를 생략하지 마세요!**
+**✅ Repository 테스트가 없으면 데이터베이스 레벨의 버그를 놓칠 수 있습니다!**
 
 ---
 
@@ -1288,6 +1580,189 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 
 ---
 
+## 📨 Spring Event 패턴 (비동기 이벤트 처리)
+
+### 개요
+
+Spring Event는 애플리케이션 내에서 비동기 이벤트 기반 통신을 구현하는 패턴입니다.
+
+**언제 사용하는가?**
+- 메인 트랜잭션과 독립적으로 실행되어야 하는 작업
+- 실패해도 메인 요청에 영향을 주지 않아야 하는 작업
+- 여러 도메인 간 결합도를 낮추고 싶을 때
+
+**GrowSnap에서의 사용 예시**:
+- 사용자가 콘텐츠에 좋아요를 누를 때
+  1. 메인 트랜잭션: `content_interactions.like_count` 증가
+  2. Spring Event 발행: `UserInteractionEvent`
+  3. 비동기 처리: `user_content_interactions` 테이블에 저장 (협업 필터링용)
+
+### ✅ Spring Event 패턴 Best Practice
+
+#### 1. 이벤트 클래스 정의
+
+```kotlin
+/**
+ * 사용자 인터랙션 이벤트
+ *
+ * 사용자의 콘텐츠 인터랙션 (LIKE, SAVE, SHARE)을 기록하기 위한 이벤트입니다.
+ *
+ * @property userId 사용자 ID
+ * @property contentId 콘텐츠 ID
+ * @property interactionType 인터랙션 타입 (LIKE, SAVE, SHARE)
+ */
+data class UserInteractionEvent(
+    val userId: UUID,
+    val contentId: UUID,
+    val interactionType: InteractionType
+)
+```
+
+#### 2. 이벤트 발행자 (Publisher)
+
+```kotlin
+@Service
+class AnalyticsServiceImpl(
+    private val contentInteractionRepository: ContentInteractionRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher  // Spring 제공
+) : AnalyticsService {
+
+    override fun trackInteractionEvent(userId: UUID, request: InteractionEventRequest): Mono<Void> {
+        val contentId = request.contentId!!
+        val interactionType = request.interactionType!!
+
+        // 1. 메인 트랜잭션: 카운터 증가
+        val incrementCounter = when (interactionType) {
+            InteractionType.LIKE -> contentInteractionRepository.incrementLikeCount(contentId)
+            InteractionType.SAVE -> contentInteractionRepository.incrementSaveCount(contentId)
+            InteractionType.SHARE -> contentInteractionRepository.incrementShareCount(contentId)
+        }
+
+        // 2. 이벤트 발행 (doOnSuccess: 메인 트랜잭션 성공 시에만 발행)
+        return incrementCounter.doOnSuccess {
+            logger.debug(
+                "Publishing UserInteractionEvent: userId={}, contentId={}, type={}",
+                userId,
+                contentId,
+                interactionType
+            )
+            applicationEventPublisher.publishEvent(
+                UserInteractionEvent(
+                    userId = userId,
+                    contentId = contentId,
+                    interactionType = interactionType
+                )
+            )
+        }.then()
+    }
+}
+```
+
+#### 3. 이벤트 리스너 (Listener)
+
+```kotlin
+@Component
+class UserInteractionEventListener(
+    private val userContentInteractionRepository: UserContentInteractionRepository
+) {
+
+    /**
+     * 사용자 인터랙션 이벤트 처리
+     *
+     * ### 처리 흐름
+     * 1. 메인 트랜잭션 커밋 후 실행 (@TransactionalEventListener + AFTER_COMMIT)
+     * 2. 비동기로 실행 (@Async)
+     * 3. user_content_interactions 테이블에 저장
+     *
+     * ### 장애 격리
+     * - 이 메서드가 실패해도 메인 트랜잭션에 영향 없음
+     * - 로그만 남기고 예외를 삼킴
+     *
+     * @param event 사용자 인터랙션 이벤트
+     */
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    fun handleUserInteractionEvent(event: UserInteractionEvent) {
+        try {
+            logger.debug(
+                "Handling UserInteractionEvent: userId={}, contentId={}, type={}",
+                event.userId,
+                event.contentId,
+                event.interactionType
+            )
+
+            // user_content_interactions 테이블에 저장 (협업 필터링용)
+            userContentInteractionRepository
+                .saveInteraction(event.userId, event.contentId, event.interactionType)
+                .subscribe(
+                    { logger.debug("User interaction saved successfully") },
+                    { error ->
+                        logger.error(
+                            "Failed to save user interaction: userId={}, contentId={}, type={}",
+                            event.userId,
+                            event.contentId,
+                            event.interactionType,
+                            error
+                        )
+                    }
+                )
+        } catch (e: Exception) {
+            // 예외를 삼켜서 메인 트랜잭션에 영향을 주지 않음
+            logger.error("Failed to handle UserInteractionEvent", e)
+        }
+    }
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(UserInteractionEventListener::class.java)
+    }
+}
+```
+
+#### 4. Spring Async 설정
+
+```kotlin
+@Configuration
+@EnableAsync
+class AsyncConfig : AsyncConfigurerSupport() {
+
+    override fun getAsyncExecutor(): Executor {
+        val executor = ThreadPoolTaskExecutor()
+        executor.corePoolSize = 5
+        executor.maxPoolSize = 10
+        executor.queueCapacity = 100
+        executor.setThreadNamePrefix("async-event-")
+        executor.initialize()
+        return executor
+    }
+}
+```
+
+### 📋 Spring Event 패턴 체크리스트
+
+- [ ] **이벤트 클래스**: data class로 정의, 필요한 최소 정보만 포함
+- [ ] **이벤트 발행**: `applicationEventPublisher.publishEvent()` 사용
+- [ ] **발행 시점**: 메인 트랜잭션 성공 시에만 발행 (`doOnSuccess`)
+- [ ] **이벤트 리스너**: `@TransactionalEventListener(phase = AFTER_COMMIT)` 사용
+- [ ] **비동기 처리**: `@Async` 사용
+- [ ] **장애 격리**: try-catch로 예외 삼킴, 로그만 남김
+- [ ] **Spring Async 설정**: `@EnableAsync` + ThreadPoolTaskExecutor 설정
+
+### ⚠️ 주의사항
+
+1. **메인 트랜잭션과 독립성 보장**
+   - 이벤트 리스너 실패가 메인 요청에 영향을 주지 않도록 설계
+   - `TransactionPhase.AFTER_COMMIT` 사용 필수
+
+2. **멱등성(Idempotency) 고려**
+   - 이벤트가 중복 발생할 수 있으므로 멱등성 보장 필요
+   - 예: UNIQUE 제약 조건 설정
+
+3. **로깅 충실**
+   - 이벤트 발행/처리 시점에 DEBUG 로그 남기기
+   - 실패 시 ERROR 로그로 추적 가능하도록
+
+---
+
 ## 🎯 요약: Claude가 반드시 지킬 것
 
 1. **TDD**: 테스트 → 구현 → 리팩토링 (시나리오 기반, Given-When-Then 주석 필수)
@@ -1306,10 +1781,12 @@ fun processMultiple(ids: List<String>): Flux<Result> {
 14. **로깅 규칙**: println 절대 금지, SLF4J Logger 필수 사용
 15. **이모티콘 금지**: 코드, 주석, 로그에 이모티콘 절대 사용 금지 (문서 파일만 허용)
 16. **FQCN 금지**: Fully Qualified Class Name 사용 금지, 반드시 import 문 사용
+17. **@AuthenticationPrincipal**: userId는 @AuthenticationPrincipal로 Spring Security Context에서 추출, Request Body/Path Variable 사용 금지
+18. **Spring Event 패턴**: 비동기 이벤트 처리 시 @TransactionalEventListener(AFTER_COMMIT) + @Async 사용, 메인 트랜잭션과 독립성 보장
 
 ---
 
-**작성일**: 2025-10-22
-**버전**: 1.0.0
+**작성일**: 2025-10-23
+**버전**: 1.1.0
 **대상**: Claude (AI 개발 어시스턴트)
 **작성자**: @12OneTwo12

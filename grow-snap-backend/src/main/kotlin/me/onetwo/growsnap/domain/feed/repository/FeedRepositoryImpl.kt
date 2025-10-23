@@ -507,6 +507,81 @@ class FeedRepositoryImpl(
             )
     }
 
+    /**
+     * 콘텐츠 ID 목록의 카테고리 조회 (사용자 선호도 분석용)
+     *
+     * @param contentIds 콘텐츠 ID 목록
+     * @return 카테고리 목록 (중복 포함)
+     */
+    override fun findCategoriesByContentIds(contentIds: List<UUID>): Flux<String> {
+        if (contentIds.isEmpty()) {
+            return Flux.empty()
+        }
+
+        return Mono.fromCallable {
+            dslContext
+                .select(CONTENT_METADATA.CATEGORY)
+                .from(CONTENT_METADATA)
+                .where(CONTENT_METADATA.CONTENT_ID.`in`(contentIds.map { it.toString() }))
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+                .fetch()
+                .map { it.get(CONTENT_METADATA.CATEGORY)!! }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
+    /**
+     * 특정 카테고리의 인기 콘텐츠 ID 조회 (카테고리 기반 추천용)
+     *
+     * @param categories 카테고리 목록
+     * @param limit 조회할 항목 수
+     * @param excludeIds 제외할 콘텐츠 ID 목록
+     * @return 인기 콘텐츠 ID 목록 (인기도 순 정렬)
+     */
+    override fun findPopularContentIdsByCategories(
+        categories: List<String>,
+        limit: Int,
+        excludeIds: List<UUID>
+    ): Flux<UUID> {
+        if (categories.isEmpty()) {
+            return Flux.empty()
+        }
+
+        return Mono.fromCallable {
+            // 인기도 점수 계산
+            val popularityScore = CONTENT_INTERACTIONS.VIEW_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_VIEW)
+                .plus(CONTENT_INTERACTIONS.LIKE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_LIKE))
+                .plus(CONTENT_INTERACTIONS.COMMENT_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_COMMENT))
+                .plus(CONTENT_INTERACTIONS.SAVE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_SAVE))
+                .plus(CONTENT_INTERACTIONS.SHARE_COUNT.cast(Double::class.java).mul(POPULARITY_WEIGHT_SHARE))
+
+            val query = dslContext
+                .select(CONTENTS.ID)
+                .from(CONTENTS)
+                .join(CONTENT_METADATA).on(CONTENT_METADATA.CONTENT_ID.eq(CONTENTS.ID))
+                .join(CONTENT_INTERACTIONS).on(CONTENT_INTERACTIONS.CONTENT_ID.eq(CONTENTS.ID))
+                .where(CONTENT_METADATA.CATEGORY.`in`(categories))
+                .and(CONTENTS.STATUS.eq("PUBLISHED"))
+                .and(CONTENTS.DELETED_AT.isNull)
+                .and(CONTENT_METADATA.DELETED_AT.isNull)
+                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
+
+            // 제외할 ID 추가
+            val finalQuery = if (excludeIds.isNotEmpty()) {
+                query.and(CONTENTS.ID.notIn(excludeIds.map { it.toString() }))
+            } else {
+                query
+            }
+
+            finalQuery
+                .orderBy(popularityScore.desc())
+                .limit(limit)
+                .fetch()
+                .map { UUID.fromString(it.get(CONTENTS.ID)) }
+        }
+            .flatMapMany { Flux.fromIterable(it) }
+    }
+
     companion object {
         /**
          * 인기도 점수 계산 가중치

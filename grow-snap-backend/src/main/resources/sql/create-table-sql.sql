@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS user_view_history (
     user_id CHAR(36) NOT NULL,
     content_id CHAR(36) NOT NULL,
     watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    watched_duration INT DEFAULT 0,  -- 시청한 시간 (초)
     completion_rate INT DEFAULT 0,  -- 0-100
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by CHAR(36) NULL,
@@ -166,3 +167,26 @@ CREATE INDEX idx_view_content_id ON user_view_history(content_id);
 CREATE INDEX idx_watched_at ON user_view_history(watched_at);
 CREATE INDEX idx_view_deleted_at ON user_view_history(deleted_at);
 CREATE INDEX idx_user_watched ON user_view_history(user_id, watched_at);
+
+-- User Content Interactions Table (사용자별 인터랙션 기록)
+-- 협업 필터링을 위한 사용자-콘텐츠 인터랙션 저장
+CREATE TABLE IF NOT EXISTS user_content_interactions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    content_id CHAR(36) NOT NULL,
+    interaction_type VARCHAR(20) NOT NULL,  -- LIKE, SAVE, SHARE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
+    CONSTRAINT unique_user_content_interaction UNIQUE (user_id, content_id, interaction_type)
+);
+
+CREATE INDEX idx_user_interaction_user_id ON user_content_interactions(user_id);
+CREATE INDEX idx_user_interaction_content_id ON user_content_interactions(content_id);
+CREATE INDEX idx_user_interaction_type ON user_content_interactions(interaction_type);
+CREATE INDEX idx_user_interaction_deleted_at ON user_content_interactions(deleted_at);
+CREATE INDEX idx_user_interaction_composite ON user_content_interactions(user_id, content_id);
