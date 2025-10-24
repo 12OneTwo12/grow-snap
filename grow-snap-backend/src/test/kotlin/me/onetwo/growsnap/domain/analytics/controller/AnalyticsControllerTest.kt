@@ -6,15 +6,19 @@ import io.mockk.verify
 import me.onetwo.growsnap.config.TestSecurityConfig
 import me.onetwo.growsnap.domain.analytics.dto.ViewEventRequest
 import me.onetwo.growsnap.domain.analytics.service.AnalyticsService
+import me.onetwo.growsnap.infrastructure.config.RestDocsConfiguration
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import me.onetwo.growsnap.util.mockUser
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
-import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.restdocs.operation.preprocess.Preprocessors.*
+import org.springframework.restdocs.payload.PayloadDocumentation.*
+import org.springframework.restdocs.webtestclient.WebTestClientRestDocumentation.document
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Mono
@@ -29,7 +33,8 @@ import java.util.UUID
  * Spring Event를 통해 처리되므로, 이 컨트롤러에서는 테스트하지 않습니다.
  */
 @WebFluxTest(AnalyticsController::class)
-@Import(TestSecurityConfig::class)
+@Import(RestDocsConfiguration::class, TestSecurityConfig::class)
+@AutoConfigureRestDocs
 @ActiveProfiles("test")
 @DisplayName("Analytics Controller 테스트")
 class AnalyticsControllerTest {
@@ -68,6 +73,20 @@ class AnalyticsControllerTest {
                 .bodyValue(request)
                 .exchange()
                 .expectStatus().isNoContent
+                .expectBody()
+                .consumeWith(
+                    document(
+                        "analytics-view-track",
+                        preprocessRequest(prettyPrint()),
+                        preprocessResponse(prettyPrint()),
+                        requestFields(
+                            fieldWithPath("contentId").description("콘텐츠 ID"),
+                            fieldWithPath("watchedDuration").description("시청 시간 (초)"),
+                            fieldWithPath("completionRate").description("완료율 (0-100)"),
+                            fieldWithPath("skipped").description("스킵 여부")
+                        )
+                    )
+                )
 
             verify(exactly = 1) { analyticsService.trackViewEvent(userId, request) }
         }
