@@ -1,8 +1,10 @@
 package me.onetwo.growsnap.domain.feed.controller
 
 import me.onetwo.growsnap.domain.feed.dto.FeedResponse
+import me.onetwo.growsnap.domain.feed.service.FeedCacheService
 import me.onetwo.growsnap.domain.feed.service.FeedService
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageRequest
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
@@ -12,15 +14,17 @@ import java.util.UUID
 /**
  * 피드 컨트롤러
  *
- * 피드 조회 API를 제공합니다.
+ * 피드 조회 및 새로고침 API를 제공합니다.
  * 요구사항 명세서 섹션 2.2.1 스마트 피드 API를 구현합니다.
  *
  * @property feedService 피드 서비스
+ * @property feedCacheService 피드 캐시 서비스
  */
 @RestController
 @RequestMapping("/api/v1/feed")
 class FeedController(
-    private val feedService: FeedService
+    private val feedService: FeedService,
+    private val feedCacheService: FeedCacheService
 ) {
 
     /**
@@ -81,5 +85,36 @@ class FeedController(
                 feedService.getFollowingFeed(userId, pageRequest)
             }
             .map { ResponseEntity.ok(it) }
+    }
+
+    /**
+     * 피드 새로고침
+     *
+     * 사용자의 추천 피드 캐시를 삭제하여 다음 조회 시 최신 추천을 제공합니다.
+     * TikTok/Instagram Reels의 "Pull to Refresh" 기능과 동일합니다.
+     *
+     * ### 처리 흐름
+     * 1. Redis에서 사용자의 모든 추천 배치 삭제
+     * 2. 다음 GET /api/v1/feed 호출 시 새로운 추천 알고리즘 실행
+     * 3. 새로운 250개 배치 생성
+     *
+     * ### 요구사항
+     * - 인증된 사용자만 호출 가능
+     * - Redis 캐시만 삭제 (성능 영향 최소화)
+     *
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
+     * @return 204 No Content
+     */
+    @PostMapping("/refresh")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun refreshFeed(
+        principal: Mono<Principal>
+    ): Mono<Void> {
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                feedCacheService.clearUserCache(userId)
+            }
+            .then()
     }
 }

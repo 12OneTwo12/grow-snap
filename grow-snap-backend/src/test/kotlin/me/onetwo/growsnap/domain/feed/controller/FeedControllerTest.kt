@@ -8,6 +8,7 @@ import me.onetwo.growsnap.domain.content.model.ContentType
 import me.onetwo.growsnap.domain.feed.dto.CreatorInfoResponse
 import me.onetwo.growsnap.domain.feed.dto.FeedItemResponse
 import me.onetwo.growsnap.domain.feed.dto.InteractionInfoResponse
+import me.onetwo.growsnap.domain.feed.service.FeedCacheService
 import me.onetwo.growsnap.domain.feed.service.FeedService
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageRequest
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageResponse
@@ -42,6 +43,9 @@ class FeedControllerTest {
 
     @MockkBean
     private lateinit var feedService: FeedService
+
+    @MockkBean
+    private lateinit var feedCacheService: FeedCacheService
 
     @Nested
     @DisplayName("GET /api/v1/feed - 메인 피드 조회")
@@ -244,6 +248,44 @@ class FeedControllerTest {
             webTestClient.get()
                 .uri("/api/v1/feed/following")
                 .accept(MediaType.APPLICATION_JSON)
+                .exchange()
+                .expectStatus().isUnauthorized
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/feed/refresh - 피드 새로고침")
+    inner class RefreshFeed {
+
+        @Test
+        @DisplayName("인증된 사용자가 새로고침 요청 시, 204 No Content를 반환한다")
+        fun refreshFeed_WithAuthentication_ReturnsNoContent() {
+            // Given: 인증된 사용자
+            val userId = UUID.fromString("550e8400-e29b-41d4-a716-446655440000")
+            every { feedCacheService.clearUserCache(userId) } returns Mono.just(true)
+
+            // When & Then: 피드 새로고침 API 호출
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
+                .uri("/api/v1/feed/refresh")
+                .exchange()
+                .expectStatus().isNoContent
+                .expectBody()
+                .consumeWith(
+                    document("feed-refresh",
+                        preprocessRequest(prettyPrint()),
+                        preprocessResponse(prettyPrint())
+                    )
+                )
+        }
+
+        @Test
+        @DisplayName("인증되지 않은 요청 시, 401 Unauthorized를 반환한다")
+        fun refreshFeed_WithoutAuth_ReturnsUnauthorized() {
+            // When & Then: 인증 없이 API 호출
+            webTestClient.post()
+                .uri("/api/v1/feed/refresh")
                 .exchange()
                 .expectStatus().isUnauthorized
         }
