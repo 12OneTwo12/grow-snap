@@ -81,7 +81,6 @@ include::user/get-by-id.adoc[]
 
 사용자 프로필 관리 API
 
-include::profile/create.adoc[]
 include::profile/get-me.adoc[]
 include::profile/get-by-userid.adoc[]
 include::profile/get-by-nickname.adoc[]
