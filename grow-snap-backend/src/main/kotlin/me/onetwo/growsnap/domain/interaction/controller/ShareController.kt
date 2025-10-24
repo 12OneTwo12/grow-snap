@@ -4,6 +4,7 @@ import me.onetwo.growsnap.domain.interaction.dto.ShareLinkResponse
 import me.onetwo.growsnap.domain.interaction.dto.ShareResponse
 import me.onetwo.growsnap.domain.interaction.service.ShareService
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
 import java.util.UUID
@@ -16,11 +17,12 @@ class ShareController(
 
     @PostMapping("/{videoId}/share")
     fun shareVideo(
+        @AuthenticationPrincipal userId: UUID,
         @PathVariable videoId: String
     ): Mono<ResponseEntity<ShareResponse>> {
         val contentId = UUID.fromString(videoId)
 
-        return shareService.shareContent(contentId)
+        return shareService.shareContent(userId, contentId)
             .map { response -> ResponseEntity.ok(response) }
     }
 

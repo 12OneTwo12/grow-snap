@@ -6,6 +6,6 @@ import reactor.core.publisher.Mono
 import java.util.UUID
 
 interface ShareService {
-    fun shareContent(contentId: UUID): Mono<ShareResponse>
+    fun shareContent(userId: UUID, contentId: UUID): Mono<ShareResponse>
     fun getShareLink(contentId: UUID): Mono<ShareLinkResponse>
 }

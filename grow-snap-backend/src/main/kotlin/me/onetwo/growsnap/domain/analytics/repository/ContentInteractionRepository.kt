@@ -90,4 +90,12 @@ interface ContentInteractionRepository {
      * @return 저장 수
      */
     fun getSaveCount(contentId: UUID): Mono<Int>
+
+    /**
+     * 공유 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 공유 수
+     */
+    fun getShareCount(contentId: UUID): Mono<Int>
 }

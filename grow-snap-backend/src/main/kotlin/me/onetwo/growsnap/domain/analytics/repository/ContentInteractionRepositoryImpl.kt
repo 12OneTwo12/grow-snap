@@ -154,6 +154,23 @@ class ContentInteractionRepositoryImpl(
     }
 
     /**
+     * 공유 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 공유 수
+     */
+    override fun getShareCount(contentId: UUID): Mono<Int> {
+        return Mono.fromCallable {
+            dslContext
+                .select(CONTENT_INTERACTIONS.SHARE_COUNT)
+                .from(CONTENT_INTERACTIONS)
+                .where(CONTENT_INTERACTIONS.CONTENT_ID.eq(contentId.toString()))
+                .and(CONTENT_INTERACTIONS.DELETED_AT.isNull)
+                .fetchOne(CONTENT_INTERACTIONS.SHARE_COUNT) ?: 0
+        }
+    }
+
+    /**
      * 카운터 증가 공통 로직
      *
      * 지정된 필드를 1 증가시키고, updated_at을 갱신합니다.
