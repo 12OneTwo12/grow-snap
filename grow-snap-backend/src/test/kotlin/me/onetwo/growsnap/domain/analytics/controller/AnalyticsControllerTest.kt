@@ -31,7 +31,7 @@ import java.util.UUID
 @WebFluxTest(AnalyticsController::class)
 @Import(TestSecurityConfig::class)
 @ActiveProfiles("test")
-@DisplayName("Analytics 컨트롤러 테스트")
+@DisplayName("Analytics Controller 테스트")
 class AnalyticsControllerTest {
 
     @Autowired

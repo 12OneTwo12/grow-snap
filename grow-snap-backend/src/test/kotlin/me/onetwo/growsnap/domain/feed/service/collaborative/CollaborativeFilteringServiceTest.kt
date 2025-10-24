@@ -34,7 +34,7 @@ import java.util.UUID
  * 3. 모든 추천 콘텐츠를 이미 봄: 빈 결과 반환
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("Collaborative Filtering 서비스 테스트")
+@DisplayName("Collaborative Filtering Service 테스트")
 class CollaborativeFilteringServiceTest {
 
     private lateinit var userContentInteractionRepository: UserContentInteractionRepository

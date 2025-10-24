@@ -31,7 +31,7 @@ import org.springframework.web.reactive.function.BodyInserters
 import reactor.core.publisher.Mono
 
 /**
- * UserProfileController 통합 테스트 + Spring Rest Docs
+ * UserProfileController 단위 테스트 + Spring Rest Docs
  */
 @WebFluxTest(controllers = [UserProfileController::class])
 @Import(TestSecurityConfig::class)

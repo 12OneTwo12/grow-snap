@@ -29,7 +29,7 @@ import java.util.UUID
  * Spring Event 패턴을 사용하여 비동기 처리되는 로직을 포함합니다.
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("Analytics 서비스 테스트")
+@DisplayName("Analytics Service 테스트")
 class AnalyticsServiceTest {
 
     private lateinit var userViewHistoryRepository: UserViewHistoryRepository

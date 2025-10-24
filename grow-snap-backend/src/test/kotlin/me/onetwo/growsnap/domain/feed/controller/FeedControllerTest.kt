@@ -34,7 +34,7 @@ import java.util.UUID
 @Import(RestDocsConfiguration::class, TestSecurityConfig::class)
 @AutoConfigureRestDocs
 @ActiveProfiles("test")
-@DisplayName("피드 컨트롤러 테스트")
+@DisplayName("피드 Controller 테스트")
 class FeedControllerTest {
 
     @Autowired

@@ -3,11 +3,10 @@ package me.onetwo.growsnap.domain.interaction.controller
 import me.onetwo.growsnap.domain.interaction.dto.LikeCountResponse
 import me.onetwo.growsnap.domain.interaction.dto.LikeResponse
 import me.onetwo.growsnap.domain.interaction.service.LikeService
-import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 /**
@@ -28,18 +27,21 @@ class LikeController(
      *
      * POST /api/v1/videos/{videoId}/like
      *
-     * @param userId 사용자 ID (Spring Security Context에서 추출)
+     * @param principal 인증된 사용자 Principal
      * @param videoId 비디오(콘텐츠) ID
      * @return 좋아요 응답
      */
     @PostMapping("/{videoId}/like")
     fun likeVideo(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable videoId: String
     ): Mono<ResponseEntity<LikeResponse>> {
-        val contentId = UUID.fromString(videoId)
-
-        return likeService.likeContent(userId, contentId)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                val contentId = UUID.fromString(videoId)
+                likeService.likeContent(userId, contentId)
+            }
             .map { response -> ResponseEntity.ok(response) }
     }
 
@@ -48,18 +50,21 @@ class LikeController(
      *
      * DELETE /api/v1/videos/{videoId}/like
      *
-     * @param userId 사용자 ID (Spring Security Context에서 추출)
+     * @param principal 인증된 사용자 Principal
      * @param videoId 비디오(콘텐츠) ID
      * @return 좋아요 응답
      */
     @DeleteMapping("/{videoId}/like")
     fun unlikeVideo(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable videoId: String
     ): Mono<ResponseEntity<LikeResponse>> {
-        val contentId = UUID.fromString(videoId)
-
-        return likeService.unlikeContent(userId, contentId)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                val contentId = UUID.fromString(videoId)
+                likeService.unlikeContent(userId, contentId)
+            }
             .map { response -> ResponseEntity.ok(response) }
     }
 

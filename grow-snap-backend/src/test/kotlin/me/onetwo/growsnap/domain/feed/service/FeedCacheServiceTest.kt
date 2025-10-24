@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
  * MockK를 사용한 단위 테스트입니다.
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("피드 캐시 서비스 테스트")
+@DisplayName("피드 캐시 Service 테스트")
 class FeedCacheServiceTest {
 
     private lateinit var reactiveRedisTemplate: ReactiveRedisTemplate<String, String>

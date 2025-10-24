@@ -25,7 +25,7 @@ import java.util.UUID
 @WebFluxTest(CommentController::class)
 @Import(TestSecurityConfig::class)
 @ActiveProfiles("test")
-@DisplayName("댓글 컨트롤러 테스트")
+@DisplayName("댓글 Controller 테스트")
 class CommentControllerTest {
 
     @Autowired

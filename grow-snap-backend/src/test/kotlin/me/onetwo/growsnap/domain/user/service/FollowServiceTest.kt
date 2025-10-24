@@ -25,7 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith
  * FollowService 단위 테스트
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("팔로우 서비스 테스트")
+@DisplayName("팔로우 Service 테스트")
 class FollowServiceTest {
 
     private lateinit var followRepository: FollowRepository

@@ -27,7 +27,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 
 /**
- * FollowController 통합 테스트 + Spring Rest Docs
+ * FollowController 단위 테스트 + Spring Rest Docs
  */
 @WebFluxTest(controllers = [FollowController::class])
 @Import(TestSecurityConfig::class)

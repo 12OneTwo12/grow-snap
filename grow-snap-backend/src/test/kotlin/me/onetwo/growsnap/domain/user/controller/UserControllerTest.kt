@@ -26,7 +26,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 
 /**
- * UserController 통합 테스트 + Spring Rest Docs
+ * UserController 단위 테스트 + Spring Rest Docs
  */
 @WebFluxTest(controllers = [UserController::class])
 @Import(TestSecurityConfig::class)

@@ -570,7 +570,7 @@ webTestClient
 @Import(TestSecurityConfig::class, RestDocsConfiguration::class)
 @ActiveProfiles("test")
 @AutoConfigureRestDocs
-@DisplayName("비디오 컨트롤러 테스트")
+@DisplayName("비디오 Controller 테스트")
 class VideoControllerTest {
 
     @Autowired
@@ -635,7 +635,7 @@ class VideoControllerTest {
 
 ```kotlin
 @ExtendWith(MockKExtension::class)
-@DisplayName("비디오 서비스 테스트")
+@DisplayName("비디오 Service 테스트")
 class VideoServiceImplTest {
 
     @MockK
