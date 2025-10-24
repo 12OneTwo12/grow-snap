@@ -2,6 +2,88 @@
 
 > Claude가 grow-snap-backend 개발 시 반드시 준수해야 할 원칙
 
+---
+
+## Claude 읽기 지침
+
+**이 파일은 매우 방대합니다. 처음부터 끝까지 읽지 마세요!**
+
+1. 먼저 아래 목차를 읽고 현재 작업과 관련된 섹션이 무엇인지 파악하세요
+2. 필요한 섹션만 찾아서 읽으세요
+3. 일반적인 작업 시 필수로 읽어야 할 섹션:
+   - **핵심 원칙** (TDD, SOLID, 문서화, Audit Trail)
+   - **계층별 역할** (Controller, Service, Repository)
+   - **요약: Claude가 반드시 지킬 것** (제일 마지막 섹션)
+
+### 작업별 필수 읽기 섹션 가이드
+
+| 작업 유형 | 필수 읽기 섹션 |
+|---------|-------------|
+| **새로운 API 개발** | 핵심 원칙 → 계층별 역할 → 테스트 작성 규칙 → REST API 설계 규칙 → 요약 |
+| **테스트 작성** | 테스트 작성 규칙 → 핵심 원칙 (TDD) → 요약 |
+| **데이터베이스 쿼리** | 자주 사용하는 패턴 (Database Query) → Audit Trail → 요약 |
+| **예외 처리** | 자주 사용하는 패턴 (예외 처리) → 요약 |
+| **이벤트 기반 처리** | Spring Event 패턴 → 요약 |
+| **코드 리뷰** | 코드 리뷰 체크리스트 → 요약 |
+
+---
+
+## 목차
+
+1. [핵심 원칙 (절대 준수)](#-핵심-원칙-절대-준수)
+   - TDD 필수
+   - SOLID 원칙
+   - 문서화 필수
+   - 테스트 작성 규칙
+   - Git Convention
+   - 엔티티 Audit Trail 필드
+
+2. [프로젝트 구조 (MVC 패턴)](#-프로젝트-구조-mvc-패턴)
+   - 계층별 역할
+   - Principal 사용 규칙 (WebFlux)
+   - 서비스 간 의존성 패턴
+
+3. [개발 프로세스](#-개발-프로세스-항상-이-순서로)
+
+4. [테스트 작성 규칙](#-테스트-작성-규칙)
+   - Controller 테스트
+   - Service 테스트
+   - Repository 테스트
+
+5. [KDoc 작성 규칙](#-kdoc-작성-규칙)
+
+6. [REST API 설계 규칙](#-rest-api-설계-규칙)
+   - URL 패턴
+   - HTTP 상태 코드
+   - WebFlux Controller 반환 타입
+
+7. [REST Docs 작성](#-rest-docs-작성-필수)
+
+8. [SOLID 원칙 적용 예시](#-solid-원칙-적용-예시)
+
+9. [코드 작성 규칙](#-코드-작성-규칙)
+   - 로깅 및 출력 규칙 (println, 이모티콘, FQCN 금지)
+   - 네이밍
+   - Kotlin 특성 활용
+   - WebFlux Reactive 패턴
+
+10. [코드 리뷰 체크리스트](#-코드-리뷰-체크리스트)
+
+11. [개발 시작 전 체크리스트](#-개발-시작-전-체크리스트)
+
+12. [자주 사용하는 패턴](#-자주-사용하는-패턴)
+    - Repository 구현 (JOOQ)
+    - Database Query 작성 규칙 (asterisk 금지)
+    - 예외 처리
+
+13. [성능 최적화](#-성능-최적화)
+
+14. [Spring Event 패턴](#-spring-event-패턴-비동기-이벤트-처리)
+
+15. [요약: Claude가 반드시 지킬 것](#-요약-claude가-반드시-지킬-것)
+
+---
+
 ## 🎯 핵심 원칙 (절대 준수)
 
 ### 1. TDD 필수
@@ -2051,12 +2133,12 @@ class AsyncConfig : AsyncConfigurerSupport() {
 14. **로깅 규칙**: println 절대 금지, SLF4J Logger 필수 사용
 15. **이모티콘 금지**: 코드, 주석, 로그에 이모티콘 절대 사용 금지 (문서 파일만 허용)
 16. **FQCN 금지**: Fully Qualified Class Name 사용 금지, 반드시 import 문 사용
-17. **@AuthenticationPrincipal**: userId는 @AuthenticationPrincipal로 Spring Security Context에서 추출, Request Body/Path Variable 사용 금지
+17. **Principal 추출 (WebFlux)**: userId는 `principal: Mono<Principal>`로 Spring Security Context에서 추출, Request Body/Path Variable/@AuthenticationPrincipal 사용 금지
 18. **Spring Event 패턴**: 비동기 이벤트 처리 시 @TransactionalEventListener(AFTER_COMMIT) + @Async 사용, 메인 트랜잭션과 독립성 보장
 
 ---
 
-**작성일**: 2025-10-23
-**버전**: 1.1.0
+**작성일**: 2025-10-24
+**버전**: 1.2.0
 **대상**: Claude (AI 개발 어시스턴트)
 **작성자**: @12OneTwo12
