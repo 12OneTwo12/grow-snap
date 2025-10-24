@@ -87,6 +87,7 @@ include::profile/get-by-userid.adoc[]
 include::profile/get-by-nickname.adoc[]
 include::profile/update.adoc[]
 include::profile/check-nickname.adoc[]
+include::profile/upload-image.adoc[]
 
 [[follow-api]]
 == Follow API
@@ -98,3 +99,12 @@ include::follow/delete.adoc[]
 include::follow/check.adoc[]
 include::follow/stats-get.adoc[]
 include::follow/stats-get-me.adoc[]
+
+[[feed-api]]
+== Feed API
+
+추천 피드 및 팔로잉 피드 API
+
+include::feed/main.adoc[]
+include::feed/following.adoc[]
+include::feed/refresh.adoc[]
