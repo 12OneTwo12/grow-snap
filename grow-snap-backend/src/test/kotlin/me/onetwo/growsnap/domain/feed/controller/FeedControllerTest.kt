@@ -12,6 +12,7 @@ import me.onetwo.growsnap.domain.feed.service.FeedService
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageRequest
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageResponse
 import me.onetwo.growsnap.infrastructure.config.RestDocsConfiguration
+import me.onetwo.growsnap.util.mockUser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -19,12 +20,12 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
-import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.restdocs.operation.preprocess.Preprocessors.*
 import org.springframework.restdocs.payload.PayloadDocumentation.*
 import org.springframework.restdocs.request.RequestDocumentation.*
 import org.springframework.restdocs.webtestclient.WebTestClientRestDocumentation.document
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Mono
 import java.util.UUID
@@ -32,6 +33,7 @@ import java.util.UUID
 @WebFluxTest(FeedController::class)
 @Import(RestDocsConfiguration::class, TestSecurityConfig::class)
 @AutoConfigureRestDocs
+@ActiveProfiles("test")
 @DisplayName("피드 컨트롤러 테스트")
 class FeedControllerTest {
 
@@ -60,13 +62,14 @@ class FeedControllerTest {
             every { feedService.getMainFeed(userId, any()) } returns Mono.just(response)
 
             // When & Then: API 호출 및 검증
-            webTestClient.get()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .get()
                 .uri { uriBuilder ->
                     uriBuilder.path("/api/v1/feed")
                         .queryParam("limit", 10)
                         .build()
                 }
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk
@@ -132,14 +135,15 @@ class FeedControllerTest {
             every { feedService.getMainFeed(userId, any()) } returns Mono.just(response)
 
             // When & Then: API 호출 및 검증
-            webTestClient.get()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .get()
                 .uri { uriBuilder ->
                     uriBuilder.path("/api/v1/feed")
                         .queryParam("cursor", cursor)
                         .queryParam("limit", 10)
                         .build()
                 }
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk
@@ -176,13 +180,14 @@ class FeedControllerTest {
             every { feedService.getFollowingFeed(userId, any()) } returns Mono.just(response)
 
             // When & Then: API 호출 및 검증
-            webTestClient.get()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .get()
                 .uri { uriBuilder ->
                     uriBuilder.path("/api/v1/feed/following")
                         .queryParam("limit", 10)
                         .build()
                 }
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk

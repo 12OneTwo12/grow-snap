@@ -6,10 +6,10 @@ import me.onetwo.growsnap.domain.interaction.dto.CommentResponse
 import me.onetwo.growsnap.domain.interaction.service.CommentService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 @RestController
@@ -20,13 +20,16 @@ class CommentController(
 
     @PostMapping("/videos/{videoId}/comments")
     fun createComment(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable videoId: String,
         @Valid @RequestBody request: CommentRequest
     ): Mono<ResponseEntity<CommentResponse>> {
-        val contentId = UUID.fromString(videoId)
-
-        return commentService.createComment(userId, contentId, request)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                val contentId = UUID.fromString(videoId)
+                commentService.createComment(userId, contentId, request)
+            }
             .map { response -> ResponseEntity.status(HttpStatus.CREATED).body(response) }
     }
 
@@ -39,11 +42,15 @@ class CommentController(
 
     @DeleteMapping("/comments/{commentId}")
     fun deleteComment(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable commentId: String
     ): Mono<ResponseEntity<Void>> {
-        val id = UUID.fromString(commentId)
-        return commentService.deleteComment(userId, id)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                val id = UUID.fromString(commentId)
+                commentService.deleteComment(userId, id)
+            }
             .then(Mono.just(ResponseEntity.noContent().build<Void>()))
     }
 }

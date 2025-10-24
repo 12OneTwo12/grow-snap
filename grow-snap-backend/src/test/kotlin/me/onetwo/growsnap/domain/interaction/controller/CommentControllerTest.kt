@@ -8,14 +8,15 @@ import me.onetwo.growsnap.domain.interaction.dto.CommentRequest
 import me.onetwo.growsnap.domain.interaction.dto.CommentResponse
 import me.onetwo.growsnap.domain.interaction.exception.CommentException
 import me.onetwo.growsnap.domain.interaction.service.CommentService
+import me.onetwo.growsnap.util.mockUser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
-import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -23,6 +24,7 @@ import java.util.UUID
 
 @WebFluxTest(CommentController::class)
 @Import(TestSecurityConfig::class)
+@ActiveProfiles("test")
 @DisplayName("댓글 컨트롤러 테스트")
 class CommentControllerTest {
 
@@ -65,9 +67,9 @@ class CommentControllerTest {
 
             // When & Then: API 호출 및 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .post()
                 .uri("/api/v1/videos/$videoId/comments")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -94,9 +96,9 @@ class CommentControllerTest {
 
             // When & Then: 400 응답 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .post()
                 .uri("/api/v1/videos/$videoId/comments")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -135,9 +137,9 @@ class CommentControllerTest {
 
             // When & Then: 대댓글 작성 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .post()
                 .uri("/api/v1/videos/$videoId/comments")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -191,9 +193,9 @@ class CommentControllerTest {
 
             // When & Then: API 호출 및 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .get()
                 .uri("/api/v1/videos/$videoId/comments")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()
@@ -216,9 +218,9 @@ class CommentControllerTest {
 
             // When & Then: 빈 배열 반환 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .get()
                 .uri("/api/v1/videos/$videoId/comments")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .exchange()
                 .expectStatus().isOk
                 .expectBody()
@@ -243,9 +245,9 @@ class CommentControllerTest {
 
             // When & Then: API 호출 및 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .delete()
                 .uri("/api/v1/comments/$commentId")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .exchange()
                 .expectStatus().isNoContent
 
@@ -264,9 +266,9 @@ class CommentControllerTest {
 
             // When & Then: 404 응답 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .delete()
                 .uri("/api/v1/comments/$commentId")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .exchange()
                 .expectStatus().isNotFound
 
@@ -285,9 +287,9 @@ class CommentControllerTest {
 
             // When & Then: 403 응답 검증
             webTestClient
+                .mutateWith(mockUser(userId))
                 .delete()
                 .uri("/api/v1/comments/$commentId")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .exchange()
                 .expectStatus().isForbidden
 

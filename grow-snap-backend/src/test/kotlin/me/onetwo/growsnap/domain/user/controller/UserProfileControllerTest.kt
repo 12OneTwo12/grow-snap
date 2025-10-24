@@ -11,6 +11,7 @@ import me.onetwo.growsnap.domain.user.exception.DuplicateNicknameException
 import me.onetwo.growsnap.domain.user.exception.UserProfileNotFoundException
 import me.onetwo.growsnap.domain.user.model.UserProfile
 import me.onetwo.growsnap.domain.user.service.UserProfileService
+import me.onetwo.growsnap.util.mockUser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -63,9 +64,10 @@ class UserProfileControllerTest {
         every { userProfileService.getProfileByUserId(testUserId) } returns testProfile
 
         // When & Then
-        webTestClient.get()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .get()
             .uri("/api/v1/profiles/me")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -192,9 +194,10 @@ class UserProfileControllerTest {
         } returns testProfile.copy(nickname = "updatednick", bio = "수정된 자기소개")
 
         // When & Then
-        webTestClient.patch()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .patch()
             .uri("/api/v1/profiles")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
@@ -290,9 +293,10 @@ class UserProfileControllerTest {
             .contentType(MediaType.IMAGE_JPEG)
             .filename("test-profile.jpg")
 
-        webTestClient.post()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .post()
             .uri("/api/v1/profiles/image")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
             .exchange()
@@ -331,9 +335,10 @@ class UserProfileControllerTest {
             .contentType(MediaType.TEXT_PLAIN)
             .filename("test.txt")
 
-        webTestClient.post()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .post()
             .uri("/api/v1/profiles/image")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(BodyInserters.fromMultipartData(multipartBodyBuilder.build()))
             .exchange()

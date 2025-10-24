@@ -9,11 +9,13 @@ import me.onetwo.growsnap.domain.analytics.service.AnalyticsService
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import me.onetwo.growsnap.util.mockUser
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 import reactor.core.publisher.Mono
 import java.util.UUID
@@ -28,6 +30,7 @@ import java.util.UUID
  */
 @WebFluxTest(AnalyticsController::class)
 @Import(TestSecurityConfig::class)
+@ActiveProfiles("test")
 @DisplayName("Analytics 컨트롤러 테스트")
 class AnalyticsControllerTest {
 
@@ -57,9 +60,10 @@ class AnalyticsControllerTest {
             every { analyticsService.trackViewEvent(userId, request) } returns Mono.empty()
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
                 .uri("/api/v1/analytics/views")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -81,9 +85,10 @@ class AnalyticsControllerTest {
             )
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
                 .uri("/api/v1/analytics/views")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -105,9 +110,10 @@ class AnalyticsControllerTest {
             )
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
                 .uri("/api/v1/analytics/views")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -132,9 +138,10 @@ class AnalyticsControllerTest {
             every { analyticsService.trackViewEvent(userId, request) } returns Mono.empty()
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
                 .uri("/api/v1/analytics/views")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()
@@ -159,9 +166,10 @@ class AnalyticsControllerTest {
             every { analyticsService.trackViewEvent(userId, request) } returns Mono.empty()
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
                 .uri("/api/v1/analytics/views")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(request)
                 .exchange()

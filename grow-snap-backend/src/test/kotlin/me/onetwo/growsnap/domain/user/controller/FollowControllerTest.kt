@@ -12,6 +12,7 @@ import me.onetwo.growsnap.domain.user.exception.CannotFollowSelfException
 import me.onetwo.growsnap.domain.user.exception.NotFollowingException
 import me.onetwo.growsnap.domain.user.model.Follow
 import me.onetwo.growsnap.domain.user.service.FollowService
+import me.onetwo.growsnap.util.mockUser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -57,9 +58,10 @@ class FollowControllerTest {
         every { followService.follow(testUserId, testFollowingId) } returns follow
 
         // When & Then
-        webTestClient.post()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .post()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isCreated
             .expectBody()
@@ -91,9 +93,10 @@ class FollowControllerTest {
         every { followService.follow(testUserId, testUserId) } throws CannotFollowSelfException()
 
         // When & Then
-        webTestClient.post()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .post()
             .uri("/api/v1/follows/{followingId}", testUserId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().is4xxClientError
     }
@@ -107,9 +110,10 @@ class FollowControllerTest {
         } throws AlreadyFollowingException(testFollowingId)
 
         // When & Then
-        webTestClient.post()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .post()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().is4xxClientError
     }
@@ -121,9 +125,10 @@ class FollowControllerTest {
         justRun { followService.unfollow(testUserId, testFollowingId) }
 
         // When & Then
-        webTestClient.delete()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .delete()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isNoContent
             .expectBody()
@@ -148,9 +153,10 @@ class FollowControllerTest {
         } throws NotFollowingException(testFollowingId)
 
         // When & Then
-        webTestClient.delete()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .delete()
             .uri("/api/v1/follows/{followingId}", testFollowingId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().is4xxClientError
     }
@@ -162,9 +168,10 @@ class FollowControllerTest {
         every { followService.isFollowing(testUserId, testFollowingId) } returns true
 
         // When & Then
-        webTestClient.get()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .get()
             .uri("/api/v1/follows/check/{followingId}", testFollowingId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -194,9 +201,10 @@ class FollowControllerTest {
         every { followService.isFollowing(testUserId, testFollowingId) } returns false
 
         // When & Then
-        webTestClient.get()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .get()
             .uri("/api/v1/follows/check/{followingId}", testFollowingId)
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -244,9 +252,10 @@ class FollowControllerTest {
         every { followService.getFollowingCount(testUserId) } returns 30
 
         // When & Then
-        webTestClient.get()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .get()
             .uri("/api/v1/follows/stats/me")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()

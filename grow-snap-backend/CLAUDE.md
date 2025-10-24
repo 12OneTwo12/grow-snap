@@ -31,6 +31,7 @@
 - **DisplayName 필수**: 한글로 명확한 시나리오 설명 (예: "유효한 요청으로 비디오 생성 시, 201과 비디오 정보를 반환한다")
 - **테스트 완료 후 빌드/테스트 실행**: 모든 테스트가 통과해야만 작업 완료
 - **통합, 단위 테스트 모두 작성할 것 ( 비중은 단위 테스트: 70%, 통합 테스트: 30%)**
+- **사용자 모킹**: 컨트롤러 테스트에서 인증된 사용자 모킹이 필요하면 `mockUser()` helper function 사용
 
 ### 5. Git Convention
 - 커밋 : /docs/GIT_CONVENTION.md 준수
@@ -237,9 +238,41 @@ fun trackViewEvent(
 }
 ```
 
+#### OAuth2 Resource Server 기반 인증
+
+**중요**: 이 프로젝트는 Spring Security OAuth2 Resource Server를 사용합니다.
+
+**인증 방식**:
+- JWT 토큰 기반 인증
+- ReactiveJwtDecoder로 토큰 검증
+- JwtAuthenticationConverter로 UUID principal 변환
+- WebFlux 환경에서는 `Mono<Principal>`로 userId 추출
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/analytics")
+class AnalyticsController(
+    private val analyticsService: AnalyticsService
+) {
+    @PostMapping("/views")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun trackViewEvent(
+        principal: Mono<Principal>,  // WebFlux에서 Principal 추출
+        @Valid @RequestBody request: ViewEventRequest
+    ): Mono<Void> {
+        return principal
+            .map { UUID.fromString(it.name) }  // Principal에서 userId 추출
+            .flatMap { userId ->
+                analyticsService.trackViewEvent(userId, request)
+            }
+    }
+}
+```
+
 #### 📋 @AuthenticationPrincipal 체크리스트
 
-- [ ] **userId는 @AuthenticationPrincipal로 추출**: Request Body나 Path Variable로 받지 않기
+- [ ] **userId는 Principal에서 추출**: Request Body나 Path Variable로 받지 않기
+- [ ] **WebFlux 패턴**: `Mono<Principal>`로 받아 `.map { UUID.fromString(it.name) }`로 변환
 - [ ] **JWT 토큰 검증 의존**: Spring Security가 토큰을 검증한 후 userId 제공
 - [ ] **보안 우선**: 클라이언트가 userId를 임의로 변경할 수 없도록 설계
 
@@ -472,11 +505,70 @@ class UserProfileFacade(
 
 ## ✅ 테스트 작성 규칙
 
+### 컨트롤러 테스트 인증 모킹 (OAuth2 Resource Server)
+
+**중요**: 이 프로젝트는 Spring Security OAuth2 Resource Server를 사용하므로, 컨트롤러 테스트에서 인증된 사용자를 모킹할 때는 반드시 `mockUser()` helper function을 사용해야 합니다.
+
+#### mockUser() Helper Function 사용법
+
+**위치**: `src/test/kotlin/me/onetwo/growsnap/util/WebTestClientExtensions.kt`
+
+```kotlin
+import me.onetwo.growsnap.util.mockUser
+
+// 사용 예시
+webTestClient
+    .mutateWith(mockUser(userId))  // 인증된 사용자 모킹
+    .post()
+    .uri("/api/v1/videos")
+    .bodyValue(request)
+    .exchange()
+    .expectStatus().isCreated
+```
+
+**규칙**:
+- ✅ **항상 mockUser() 사용**: 컨트롤러 테스트에서 인증이 필요한 API는 `mockUser(userId)` 사용
+- ✅ **mutateWith() 위치**: HTTP 메서드(post, get 등) 호출 전에 `.mutateWith(mockUser(userId))` 호출
+- ❌ **하드코딩 금지**: `.header(HttpHeaders.AUTHORIZATION, "Bearer ...")` 하드코딩 금지
+- ❌ **순서 주의**: `.post().mutateWith(...)` 순서는 작동하지 않음
+
+#### 잘못된 예시
+
+```kotlin
+// ❌ BAD: Authorization 헤더 하드코딩
+webTestClient.post()
+    .uri("/api/v1/videos")
+    .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
+    .exchange()
+
+// ❌ BAD: mutateWith() 호출 순서 틀림
+webTestClient.post()
+    .uri("/api/v1/videos")
+    .mutateWith(mockUser(userId))  // post() 이후에 호출하면 작동하지 않음
+    .exchange()
+```
+
+#### 올바른 예시
+
+```kotlin
+// ✅ GOOD: mockUser() helper function 사용
+val userId = UUID.randomUUID()
+
+webTestClient
+    .mutateWith(mockUser(userId))  // HTTP 메서드 전에 호출
+    .post()
+    .uri("/api/v1/videos")
+    .bodyValue(request)
+    .exchange()
+    .expectStatus().isCreated
+```
+
 ### Controller 테스트 템플릿
 
 ```kotlin
 @WebFluxTest(VideoController::class)
-@Import(SecurityConfig::class, RestDocsConfiguration::class)
+@Import(TestSecurityConfig::class, RestDocsConfiguration::class)
+@ActiveProfiles("test")
 @AutoConfigureRestDocs
 @DisplayName("비디오 컨트롤러 테스트")
 class VideoControllerTest {
@@ -495,12 +587,15 @@ class VideoControllerTest {
         @DisplayName("유효한 요청으로 생성 시, 201 Created와 비디오 정보를 반환한다")
         fun createVideo_WithValidRequest_ReturnsCreatedVideo() {
             // Given: 테스트 데이터 준비
+            val userId = UUID.randomUUID()
             val request = VideoCreateRequest(/* ... */)
             val expected = VideoResponse(/* ... */)
-            every { videoService.createVideo(any()) } returns Mono.just(expected)
+            every { videoService.createVideo(userId, any()) } returns Mono.just(expected)
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))  // 인증된 사용자 모킹
+                .post()
                 .uri("/api/v1/videos")
                 .bodyValue(request)
                 .exchange()
@@ -514,14 +609,23 @@ class VideoControllerTest {
                     )
                 )
 
-            verify(exactly = 1) { videoService.createVideo(request) }
+            verify(exactly = 1) { videoService.createVideo(userId, request) }
         }
 
         @Test
         @DisplayName("제목이 비어있는 경우, 400 Bad Request를 반환한다")
         fun createVideo_WithEmptyTitle_ReturnsBadRequest() {
             // Given: 잘못된 요청
+            val userId = UUID.randomUUID()
+
             // When & Then: 400 응답 검증
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
+                .uri("/api/v1/videos")
+                .bodyValue(mapOf("title" to ""))
+                .exchange()
+                .expectStatus().isBadRequest
         }
     }
 }

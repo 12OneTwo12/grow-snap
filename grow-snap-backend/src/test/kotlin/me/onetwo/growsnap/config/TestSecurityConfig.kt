@@ -1,98 +1,102 @@
 package me.onetwo.growsnap.config
 
-import io.mockk.every
 import io.mockk.mockk
-import me.onetwo.growsnap.domain.user.model.UserRole
 import me.onetwo.growsnap.infrastructure.security.config.PublicApiPaths
-import me.onetwo.growsnap.infrastructure.security.jwt.JwtAuthenticationWebFilter
 import me.onetwo.growsnap.infrastructure.security.jwt.JwtTokenProvider
+import me.onetwo.growsnap.infrastructure.security.jwt.UuidJwtAuthenticationToken
+import me.onetwo.growsnap.infrastructure.security.oauth2.CustomReactiveOAuth2UserService
+import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationFailureHandler
+import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationSuccessHandler
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Primary
+import org.springframework.core.convert.converter.Converter
+import org.springframework.security.authentication.AbstractAuthenticationToken
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder
 import org.springframework.security.config.web.server.ServerHttpSecurity
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder
 import org.springframework.security.web.server.SecurityWebFilterChain
+import reactor.core.publisher.Mono
 import java.util.UUID
 
 /**
  * 테스트용 Security 설정
  *
- * JWT 인증을 mock으로 시뮬레이션하여 실제와 유사하게 테스트합니다.
+ * Spring Security Test의 mockJwt()와 호환되는 설정입니다.
  *
  * ### 테스트 인증 방식
- * 1. Authorization 헤더에 "Bearer {token}" 필요
- * 2. Mock JwtTokenProvider가 토큰을 항상 유효하다고 검증
- * 3. X-User-Id 헤더의 값을 userId로 사용 (테스트 편의성)
+ * - `.mutateWith(mockJwt())` 사용 (Spring Security Test 표준)
+ * - JWT claim에서 subject를 userId로 사용
+ * - 실제 JWT 검증 로직은 mock으로 대체
  *
- * ### 주의사항
- * - 실제 JWT 검증 로직은 mock으로 대체됨
- * - Authorization 헤더가 없으면 401 Unauthorized 반환
- * - 실제 환경과 유사하게 인증 필요 API는 토큰 필수
+ * ### 사용 예시
+ * ```kotlin
+ * webTestClient
+ *     .get()
+ *     .uri("/api/v1/users/me")
+ *     .mutateWith(mockJwt().jwt { jwt -> jwt.subject(userId.toString()) })
+ *     .exchange()
+ * ```
  */
 @TestConfiguration
 @EnableWebFluxSecurity
 class TestSecurityConfig {
 
     /**
-     * 테스트용 Mock JwtTokenProvider
+     * 테스트용 Mock JWT Decoder
      *
-     * 모든 토큰을 유효하다고 간주하고, 토큰에서 userId를 추출합니다.
-     *
-     * ### 토큰 형식
-     * - "test-token-{userId}": userId를 포함한 테스트 토큰
-     * - 예: "test-token-550e8400-e29b-41d4-a716-446655440000"
+     * JWT 검증을 우회하고 모든 토큰을 유효하다고 간주합니다.
      */
     @Bean
-    @Primary
-    fun mockJwtTokenProvider(): JwtTokenProvider {
-        val mockProvider = mockk<JwtTokenProvider>(relaxed = true)
-
-        // 모든 토큰을 유효하다고 간주
-        every { mockProvider.validateToken(any()) } returns true
-
-        // 토큰에서 userId 추출: "test-token-{uuid}" 형식
-        every { mockProvider.getUserIdFromToken(any()) } answers {
-            val token = firstArg<String>()
-            try {
-                // "test-token-" 접두사 제거 후 UUID 파싱
-                val uuidStr = token.removePrefix("test-token-")
-                UUID.fromString(uuidStr)
-            } catch (e: Exception) {
-                // 파싱 실패 시 기본 UUID 반환
-                UUID.fromString("00000000-0000-0000-0000-000000000000")
-            }
+    fun reactiveJwtDecoder(): ReactiveJwtDecoder {
+        return ReactiveJwtDecoder { token ->
+            Mono.error(IllegalStateException("JWT decoder should not be called in tests. Use mockJwt() instead."))
         }
-
-        every { mockProvider.getEmailFromToken(any()) } returns "test@example.com"
-        every { mockProvider.getRoleFromToken(any()) } returns UserRole.USER
-
-        return mockProvider
     }
 
     /**
-     * 테스트용 JwtAuthenticationWebFilter
+     * 테스트용 JWT Authentication Converter
      *
-     * Mock JwtTokenProvider를 사용하는 JWT 인증 필터입니다.
+     * mockJwt()로 설정된 JWT를 UuidJwtAuthenticationToken으로 변환합니다.
      */
     @Bean
-    fun testJwtAuthenticationWebFilter(jwtTokenProvider: JwtTokenProvider): JwtAuthenticationWebFilter {
-        return JwtAuthenticationWebFilter(jwtTokenProvider)
+    fun jwtAuthenticationConverter(): Converter<Jwt, Mono<AbstractAuthenticationToken>> {
+        return Converter { jwt ->
+            val userId = UUID.fromString(jwt.subject)
+            val authentication = UuidJwtAuthenticationToken(userId, jwt, emptyList())
+            Mono.just(authentication)
+        }
     }
+
+    /**
+     * 테스트용 Mock JwtTokenProvider
+     *
+     * OAuth2 로그인 성공 핸들러에서 사용하는 JwtTokenProvider를 mock으로 제공합니다.
+     */
+    @Bean
+    fun jwtTokenProvider(): JwtTokenProvider = mockk(relaxed = true)
+
+    /**
+     * 테스트용 Mock OAuth2 서비스 및 핸들러
+     */
+    @Bean
+    fun customReactiveOAuth2UserService(): CustomReactiveOAuth2UserService = mockk(relaxed = true)
+
+    @Bean
+    fun oAuth2AuthenticationSuccessHandler(): OAuth2AuthenticationSuccessHandler = mockk(relaxed = true)
+
+    @Bean
+    fun oAuth2AuthenticationFailureHandler(): OAuth2AuthenticationFailureHandler = mockk(relaxed = true)
 
     /**
      * 테스트용 Security 필터 체인
      *
-     * 실제 환경과 유사하게 JWT 인증을 요구하지만, mock으로 처리합니다.
+     * OAuth2 Resource Server 설정으로 JWT 인증을 활성화합니다.
      */
     @Bean
-    fun testSecurityWebFilterChain(
-        http: ServerHttpSecurity,
-        jwtAuthenticationWebFilter: JwtAuthenticationWebFilter
-    ): SecurityWebFilterChain {
+    fun testSecurityWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {
         return http
             .csrf { it.disable() }
-            .addFilterAt(jwtAuthenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .authorizeExchange { authorize ->
                 authorize
                     // 인증이 필요 없는 공개 API
@@ -101,6 +105,9 @@ class TestSecurityConfig {
                     .pathMatchers(PublicApiPaths.GetOnly.METHOD, *PublicApiPaths.GetOnly.PATHS).permitAll()
                     // 나머지는 JWT 인증 필요
                     .anyExchange().authenticated()
+            }
+            .oauth2ResourceServer { oauth2 ->
+                oauth2.jwt { }
             }
             .build()
     }
