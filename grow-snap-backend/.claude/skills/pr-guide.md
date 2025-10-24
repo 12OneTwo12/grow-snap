@@ -26,11 +26,11 @@ Git Convention의 커밋 메시지 형식과 동일하게 작성합니다:
 ### PR 제목 예시
 
 ```
-[Feat] 사용자 프로필 조회 API 추가
-[Fix] 비디오 자동재생 오류 수정
-[Docs] CLAUDE.md를 Claude Code Skills로 분리하여 토큰 효율성 개선
-[Refactor] Service 레이어 SOLID 원칙 적용
-[Test] Controller 테스트 템플릿 적용
+[Feat] 사용자 프로필 조회 API 추가 (ISSUE-30)
+[Fix] 비디오 자동재생 오류 수정 (ISSUE-27)
+[Docs] CLAUDE.md를 Claude Code Skills로 분리하여 토큰 효율성 개선 (ISSUE-39)
+[Refactor] Service 레이어 SOLID 원칙 적용 (ISSUE-25)
+[Test] Controller 테스트 템플릿 적용 (ISSUE-22)
 ```
 
 ## PR 본문 템플릿
@@ -362,7 +362,7 @@ Closes #39
 
 **PR 생성 전 반드시 확인:**
 
-- [ ] **PR 제목**: `[Type] 간단한 설명` 형식
+- [ ] **PR 제목**: `[Type] 간단한 설명 (이슈 번호)` 형식
 - [ ] **관련 이슈**: `Closes #이슈번호` 명시
 - [ ] **작업 사항**: 변경 내용을 구체적으로 나열
 - [ ] **테스트**: 모든 테스트 통과 확인
