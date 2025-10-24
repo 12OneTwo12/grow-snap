@@ -51,6 +51,9 @@ dependencies {
     // Embedded Redis for testing
     testImplementation("com.github.kstyrc:embedded-redis:0.6")
 
+    // ArchUnit for architecture testing
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+
     // OAuth2 Client
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 
