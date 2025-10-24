@@ -23,7 +23,7 @@ import javax.imageio.ImageIO
  * ImageUploadService 단위 테스트
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("이미지 업로드 서비스 테스트")
+@DisplayName("이미지 업로드 Service 테스트")
 class ImageUploadServiceImplTest {
 
     private lateinit var s3Client: S3Client

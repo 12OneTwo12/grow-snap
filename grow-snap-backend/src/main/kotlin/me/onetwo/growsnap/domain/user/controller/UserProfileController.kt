@@ -9,7 +9,6 @@ import me.onetwo.growsnap.domain.user.service.UserProfileService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.codec.multipart.FilePart
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -19,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestPart
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 /**
@@ -37,17 +37,19 @@ class UserProfileController(
     /**
      * 내 프로필 조회
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @return 프로필 정보
      */
     @GetMapping("/me")
     fun getMyProfile(
-        @AuthenticationPrincipal userId: UUID
+        principal: Mono<Principal>
     ): Mono<ResponseEntity<UserProfileResponse>> {
-        return Mono.fromCallable {
-            val profile = userProfileService.getProfileByUserId(userId)
-            ResponseEntity.ok(UserProfileResponse.from(profile))
-        }
+        return principal
+            .map { UUID.fromString(it.name) }
+            .map { userId ->
+                val profile = userProfileService.getProfileByUserId(userId)
+                ResponseEntity.ok(UserProfileResponse.from(profile))
+            }
     }
 
     /**
@@ -85,24 +87,26 @@ class UserProfileController(
     /**
      * 프로필 수정
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @param request 프로필 수정 요청
      * @return 수정된 프로필 정보
      */
     @PatchMapping
     fun updateProfile(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @Valid @RequestBody request: UpdateProfileRequest
     ): Mono<ResponseEntity<UserProfileResponse>> {
-        return Mono.fromCallable {
-            val profile = userProfileService.updateProfile(
-                userId = userId,
-                nickname = request.nickname,
-                profileImageUrl = request.profileImageUrl,
-                bio = request.bio
-            )
-            ResponseEntity.ok(UserProfileResponse.from(profile))
-        }
+        return principal
+            .map { UUID.fromString(it.name) }
+            .map { userId ->
+                val profile = userProfileService.updateProfile(
+                    userId = userId,
+                    nickname = request.nickname,
+                    profileImageUrl = request.profileImageUrl,
+                    bio = request.bio
+                )
+                ResponseEntity.ok(UserProfileResponse.from(profile))
+            }
     }
 
     /**
@@ -126,18 +130,21 @@ class UserProfileController(
      *
      * 이미지는 리사이징된 후 S3에 저장되며, 업로드된 이미지 URL을 반환합니다.
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @param filePart 업로드할 이미지 파일
      * @return 업로드된 이미지 URL
      */
     @PostMapping("/image")
     fun uploadProfileImage(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @RequestPart("file") filePart: Mono<FilePart>
     ): Mono<ResponseEntity<ImageUploadResponse>> {
-        return filePart
-            .flatMap { file ->
-                userProfileService.uploadProfileImage(userId, file)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                filePart.flatMap { file ->
+                    userProfileService.uploadProfileImage(userId, file)
+                }
             }
             .map { imageUrl ->
                 ResponseEntity.status(HttpStatus.CREATED).body(ImageUploadResponse(imageUrl))

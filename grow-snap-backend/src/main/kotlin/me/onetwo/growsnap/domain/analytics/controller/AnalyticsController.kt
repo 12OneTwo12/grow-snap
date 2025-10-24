@@ -4,13 +4,13 @@ import jakarta.validation.Valid
 import me.onetwo.growsnap.domain.analytics.dto.ViewEventRequest
 import me.onetwo.growsnap.domain.analytics.service.AnalyticsService
 import org.springframework.http.HttpStatus
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 /**
@@ -60,9 +60,13 @@ class AnalyticsController(
     @PostMapping("/views")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun trackViewEvent(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @Valid @RequestBody request: ViewEventRequest
     ): Mono<Void> {
-        return analyticsService.trackViewEvent(userId, request)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                analyticsService.trackViewEvent(userId, request)
+            }
     }
 }

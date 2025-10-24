@@ -50,4 +50,52 @@ interface ContentInteractionRepository {
      * @return 업데이트 완료 신호
      */
     fun incrementCommentCount(contentId: UUID): Mono<Void>
+
+    /**
+     * 좋아요 수 감소
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 업데이트 완료 신호
+     */
+    fun decrementLikeCount(contentId: UUID): Mono<Void>
+
+    /**
+     * 저장 수 감소
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 업데이트 완료 신호
+     */
+    fun decrementSaveCount(contentId: UUID): Mono<Void>
+
+    /**
+     * 댓글 수 감소
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 업데이트 완료 신호
+     */
+    fun decrementCommentCount(contentId: UUID): Mono<Void>
+
+    /**
+     * 좋아요 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 좋아요 수
+     */
+    fun getLikeCount(contentId: UUID): Mono<Int>
+
+    /**
+     * 저장 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 저장 수
+     */
+    fun getSaveCount(contentId: UUID): Mono<Int>
+
+    /**
+     * 공유 수 조회
+     *
+     * @param contentId 콘텐츠 ID
+     * @return 공유 수
+     */
+    fun getShareCount(contentId: UUID): Mono<Int>
 }

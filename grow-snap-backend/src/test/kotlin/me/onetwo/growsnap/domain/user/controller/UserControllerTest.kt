@@ -11,6 +11,7 @@ import me.onetwo.growsnap.domain.user.model.OAuthProvider
 import me.onetwo.growsnap.domain.user.model.User
 import me.onetwo.growsnap.domain.user.model.UserRole
 import me.onetwo.growsnap.domain.user.service.UserService
+import me.onetwo.growsnap.util.mockUser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -25,7 +26,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.reactive.server.WebTestClient
 
 /**
- * UserController 통합 테스트 + Spring Rest Docs
+ * UserController 단위 테스트 + Spring Rest Docs
  */
 @WebFluxTest(controllers = [UserController::class])
 @Import(TestSecurityConfig::class)
@@ -56,9 +57,10 @@ class UserControllerTest {
         every { userService.getUserById(testUserId) } returns testUser
 
         // When & Then
-        webTestClient.get()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .get()
             .uri("/api/v1/users/me")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isOk
             .expectBody()
@@ -141,9 +143,10 @@ class UserControllerTest {
         every { userService.withdrawUser(testUserId) } returns Unit
 
         // When & Then
-        webTestClient.delete()
+        webTestClient
+            .mutateWith(mockUser(testUserId))
+            .delete()
             .uri("/api/v1/users/me")
-            .header("Authorization", "Bearer test-token-${testUserId}")
             .exchange()
             .expectStatus().isNoContent
             .expectBody()

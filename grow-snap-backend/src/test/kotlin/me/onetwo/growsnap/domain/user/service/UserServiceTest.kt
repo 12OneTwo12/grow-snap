@@ -25,7 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith
  * UserService 단위 테스트
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("사용자 서비스 테스트")
+@DisplayName("사용자 Service 테스트")
 class UserServiceTest {
 
     private lateinit var userRepository: UserRepository

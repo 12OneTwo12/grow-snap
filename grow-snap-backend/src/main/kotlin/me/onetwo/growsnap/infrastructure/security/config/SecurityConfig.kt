@@ -1,6 +1,6 @@
 package me.onetwo.growsnap.infrastructure.security.config
 
-import me.onetwo.growsnap.infrastructure.security.jwt.JwtAuthenticationWebFilter
+import me.onetwo.growsnap.infrastructure.security.jwt.JwtAuthenticationConverter
 import me.onetwo.growsnap.infrastructure.security.oauth2.CustomReactiveOAuth2UserService
 import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationFailureHandler
 import me.onetwo.growsnap.infrastructure.security.oauth2.OAuth2AuthenticationSuccessHandler
@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.authentication.ReactiveAuthenticationManager
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity
-import org.springframework.security.config.web.server.SecurityWebFiltersOrder
 import org.springframework.security.config.web.server.ServerHttpSecurity
 import org.springframework.security.oauth2.client.authentication.OAuth2LoginReactiveAuthenticationManager
 import org.springframework.security.oauth2.client.endpoint.WebClientReactiveAuthorizationCodeTokenResponseClient
@@ -20,30 +19,36 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource
 /**
  * Spring Security 설정
  *
- * OAuth2 로그인, JWT 인증, CORS, 인증/인가 규칙을 설정합니다.
+ * OAuth2 로그인, OAuth2 Resource Server (JWT 인증), CORS, 인증/인가 규칙을 설정합니다.
+ *
+ * ### 인증 방식
+ * 1. OAuth2 소셜 로그인 (Google/Naver/Kakao) - 최초 로그인
+ * 2. OAuth2 Resource Server (JWT) - API 요청 시 JWT 토큰 검증
  */
 @Configuration
 @EnableWebFluxSecurity
 class SecurityConfig(
     private val customOAuth2UserService: CustomReactiveOAuth2UserService,
     private val oAuth2SuccessHandler: OAuth2AuthenticationSuccessHandler,
-    private val oAuth2FailureHandler: OAuth2AuthenticationFailureHandler
+    private val oAuth2FailureHandler: OAuth2AuthenticationFailureHandler,
+    private val jwtAuthenticationConverter: JwtAuthenticationConverter
 ) {
 
     /**
      * Spring Security 필터 체인 설정
      *
-     * OAuth2 로그인, JWT 인증, CORS, CSRF, 인증/인가 규칙을 구성합니다.
+     * OAuth2 로그인, OAuth2 Resource Server (JWT), CORS, CSRF, 인증/인가 규칙을 구성합니다.
+     *
+     * ### OAuth2 Resource Server
+     * - JWT 토큰을 자동으로 검증하고 인증 객체를 생성합니다.
+     * - ReactiveJwtDecoder가 JWT 토큰을 파싱하고 검증합니다.
+     * - JwtAuthenticationConverter가 JWT의 subject를 UUID로 변환하여 principal로 설정합니다.
      */
     @Bean
-    fun securityWebFilterChain(
-        http: ServerHttpSecurity,
-        jwtAuthenticationWebFilter: JwtAuthenticationWebFilter
-    ): SecurityWebFilterChain {
+    fun securityWebFilterChain(http: ServerHttpSecurity): SecurityWebFilterChain {
         return http
             .csrf { it.disable() }
             .cors { it.configurationSource(corsConfigurationSource()) }
-            .addFilterAt(jwtAuthenticationWebFilter, SecurityWebFiltersOrder.AUTHENTICATION)
             .authorizeExchange { authorize ->
                 authorize
                     // 인증이 필요 없는 공개 API
@@ -58,6 +63,11 @@ class SecurityConfig(
                     .authenticationSuccessHandler(oAuth2SuccessHandler)
                     .authenticationFailureHandler(oAuth2FailureHandler)
                     .authenticationManager(oauth2AuthenticationManager())
+            }
+            .oauth2ResourceServer { oauth2 ->
+                oauth2.jwt { jwt ->
+                    jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)
+                }
             }
             .build()
     }

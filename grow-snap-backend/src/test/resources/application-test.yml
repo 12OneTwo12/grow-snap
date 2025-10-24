@@ -2,6 +2,10 @@ spring:
   application:
     name: grow-snap-backend-test
 
+  # Bean Override Configuration
+  main:
+    allow-bean-definition-overriding: true
+
   # H2 Database for Testing
   datasource:
     url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE

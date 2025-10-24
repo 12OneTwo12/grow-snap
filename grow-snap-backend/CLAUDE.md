@@ -31,6 +31,7 @@
 - **DisplayName 필수**: 한글로 명확한 시나리오 설명 (예: "유효한 요청으로 비디오 생성 시, 201과 비디오 정보를 반환한다")
 - **테스트 완료 후 빌드/테스트 실행**: 모든 테스트가 통과해야만 작업 완료
 - **통합, 단위 테스트 모두 작성할 것 ( 비중은 단위 테스트: 70%, 통합 테스트: 30%)**
+- **사용자 모킹**: 컨트롤러 테스트에서 인증된 사용자 모킹이 필요하면 `mockUser()` helper function 사용
 
 ### 5. Git Convention
 - 커밋 : /docs/GIT_CONVENTION.md 준수
@@ -237,9 +238,41 @@ fun trackViewEvent(
 }
 ```
 
+#### OAuth2 Resource Server 기반 인증
+
+**중요**: 이 프로젝트는 Spring Security OAuth2 Resource Server를 사용합니다.
+
+**인증 방식**:
+- JWT 토큰 기반 인증
+- ReactiveJwtDecoder로 토큰 검증
+- JwtAuthenticationConverter로 UUID principal 변환
+- WebFlux 환경에서는 `Mono<Principal>`로 userId 추출
+
+```kotlin
+@RestController
+@RequestMapping("/api/v1/analytics")
+class AnalyticsController(
+    private val analyticsService: AnalyticsService
+) {
+    @PostMapping("/views")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun trackViewEvent(
+        principal: Mono<Principal>,  // WebFlux에서 Principal 추출
+        @Valid @RequestBody request: ViewEventRequest
+    ): Mono<Void> {
+        return principal
+            .map { UUID.fromString(it.name) }  // Principal에서 userId 추출
+            .flatMap { userId ->
+                analyticsService.trackViewEvent(userId, request)
+            }
+    }
+}
+```
+
 #### 📋 @AuthenticationPrincipal 체크리스트
 
-- [ ] **userId는 @AuthenticationPrincipal로 추출**: Request Body나 Path Variable로 받지 않기
+- [ ] **userId는 Principal에서 추출**: Request Body나 Path Variable로 받지 않기
+- [ ] **WebFlux 패턴**: `Mono<Principal>`로 받아 `.map { UUID.fromString(it.name) }`로 변환
 - [ ] **JWT 토큰 검증 의존**: Spring Security가 토큰을 검증한 후 userId 제공
 - [ ] **보안 우선**: 클라이언트가 userId를 임의로 변경할 수 없도록 설계
 
@@ -251,19 +284,185 @@ fun trackViewEvent(
 - ✅ 트랜잭션 관리 (@Transactional)
 - ✅ 복잡한 데이터 처리 (FilePart 처리, 이미지 변환 등)
 - ✅ 다른 서비스 호출 (서비스 간 조율)
-- ✅ Repository 호출 (데이터베이스 접근)
+- ✅ **Repository 호출 (데이터베이스 접근)**
+- ✅ **Mono/Flux 변환 (Repository 결과를 Reactive로 변환)**
 - ✅ 예외 처리 및 변환
 - ❌ HTTP 요청/응답 처리 금지
 - ❌ HTTP 상태 코드 결정 금지
+- ❌ **DSLContext 직접 사용 금지 (JOOQ 쿼리 금지)**
+
+##### Service 계층 규칙 상세
+
+**절대 준수**: Service는 Repository를 통해서만 데이터베이스에 접근합니다.
+
+```kotlin
+// ✅ GOOD: Service가 Repository를 호출하고 Mono/Flux로 변환
+@Service
+class CommentServiceImpl(
+    private val commentRepository: CommentRepository,
+    private val userProfileRepository: UserProfileRepository
+) : CommentService {
+
+    override fun createComment(userId: UUID, contentId: UUID, request: CommentRequest): Mono<CommentResponse> {
+        // Repository 호출 결과를 Mono로 변환
+        return Mono.fromCallable {
+            commentRepository.save(
+                Comment(
+                    contentId = contentId,
+                    userId = userId,
+                    content = request.content
+                )
+            ) ?: throw IllegalStateException("Failed to create comment")
+        }.flatMap { savedComment ->
+            // 사용자 정보도 Repository를 통해 조회
+            Mono.fromCallable {
+                userProfileRepository.findUserInfosByUserIds(setOf(userId))
+            }.map { userInfoMap ->
+                val (nickname, profileImageUrl) = userInfoMap[userId] ?: Pair("Unknown", null)
+                CommentResponse(
+                    id = savedComment.id!!.toString(),
+                    userNickname = nickname,
+                    userProfileImageUrl = profileImageUrl,
+                    content = savedComment.content
+                )
+            }
+        }
+    }
+
+    override fun getComments(contentId: UUID): Flux<CommentResponse> {
+        // Repository 호출 결과를 Flux로 변환
+        return Mono.fromCallable {
+            commentRepository.findByContentId(contentId)
+        }.flatMapMany { comments ->
+            val userIds = comments.map { it.userId }.toSet()
+
+            Mono.fromCallable {
+                userProfileRepository.findUserInfosByUserIds(userIds)
+            }.flatMapMany { userInfoMap ->
+                Flux.fromIterable(comments).map { comment ->
+                    val userInfo = userInfoMap[comment.userId] ?: Pair("Unknown", null)
+                    mapToCommentResponse(comment, userInfo)
+                }
+            }
+        }
+    }
+}
+
+// ❌ BAD: Service가 DSLContext를 직접 사용 (JOOQ 쿼리 실행)
+@Service
+class CommentServiceImpl(
+    private val commentRepository: CommentRepository,
+    private val dslContext: DSLContext  // ❌ Service에서 DSLContext 직접 사용
+) : CommentService {
+
+    override fun createComment(userId: UUID, contentId: UUID, request: CommentRequest): Mono<CommentResponse> {
+        return commentRepository.save(comment)
+            .flatMap { savedComment ->
+                // ❌ Service에서 JOOQ 쿼리 직접 실행 (Repository 역할 침범)
+                Mono.fromCallable {
+                    dslContext
+                        .select(USER_PROFILES.NICKNAME, USER_PROFILES.PROFILE_IMAGE_URL)
+                        .from(USER_PROFILES)
+                        .where(USER_PROFILES.USER_ID.eq(userId.toString()))
+                        .fetchOne()
+                        ?.let {
+                            Pair(
+                                it.getValue(USER_PROFILES.NICKNAME) ?: "Unknown",
+                                it.getValue(USER_PROFILES.PROFILE_IMAGE_URL)
+                            )
+                        }
+                }.map { (nickname, profileImageUrl) ->
+                    CommentResponse(
+                        id = savedComment.id!!.toString(),
+                        userNickname = nickname,
+                        userProfileImageUrl = profileImageUrl
+                    )
+                }
+            }
+    }
+}
+```
+
+**Service 체크리스트**:
+- [ ] **Repository만 호출**: 데이터베이스 접근은 Repository를 통해서만
+- [ ] **DSLContext 사용 금지**: Service에서 JOOQ 쿼리 직접 실행 금지
+- [ ] **Mono/Flux 변환**: Repository 결과를 `Mono.fromCallable`로 변환
+- [ ] **비즈니스 로직**: Repository를 조합하여 비즈니스 로직 구현
 
 #### Repository (레포지토리)
 
 **역할**: 데이터베이스 CRUD
 
-- ✅ 데이터베이스 쿼리 실행 (JOOQ 사용)
+- ✅ 데이터베이스 쿼리 실행 (JOOQ만 사용)
 - ✅ Entity 저장/조회/수정/삭제
+- ✅ 순수한 타입 반환 (Entity, List, Boolean 등)
+- ❌ **Mono/Flux 반환 금지** (Service에서 변환)
 - ❌ 비즈니스 로직 금지
 - ❌ 다른 Repository 호출 최소화
+
+##### Repository 계층 규칙 상세
+
+**절대 준수**: Repository는 JOOQ를 사용한 순수한 데이터베이스 쿼리만 작성합니다.
+
+```kotlin
+// ✅ GOOD: Repository는 순수 타입 반환
+@Repository
+class CommentRepositoryImpl(
+    private val dslContext: DSLContext
+) : CommentRepository {
+
+    override fun save(comment: Comment): Comment? {
+        return dslContext
+            .insertInto(COMMENTS)
+            .set(COMMENTS.ID, comment.id.toString())
+            .set(COMMENTS.CONTENT, comment.content)
+            .returning()
+            .fetchOne()
+            ?.let { recordToComment(it) }
+    }
+
+    override fun findById(commentId: UUID): Comment? {
+        return dslContext
+            .select(COMMENTS.ID, COMMENTS.CONTENT)
+            .from(COMMENTS)
+            .where(COMMENTS.ID.eq(commentId.toString()))
+            .and(COMMENTS.DELETED_AT.isNull)
+            .fetchOne()
+            ?.let { recordToComment(it) }
+    }
+
+    override fun findByContentId(contentId: UUID): List<Comment> {
+        return dslContext
+            .select(COMMENTS.ID, COMMENTS.CONTENT)
+            .from(COMMENTS)
+            .where(COMMENTS.CONTENT_ID.eq(contentId.toString()))
+            .and(COMMENTS.DELETED_AT.isNull)
+            .fetch()
+            .map { recordToComment(it) }
+    }
+}
+
+// ❌ BAD: Repository가 Mono/Flux 반환
+@Repository
+class CommentRepositoryImpl(
+    private val dslContext: DSLContext
+) : CommentRepository {
+
+    override fun save(comment: Comment): Mono<Comment> {
+        return Mono.fromCallable {
+            dslContext.insertInto(COMMENTS)
+                .set(COMMENTS.ID, comment.id.toString())
+                .execute()
+        }.map { comment }
+    }
+}
+```
+
+**Repository 체크리스트**:
+- [ ] **JOOQ만 사용**: DSLContext를 사용한 순수한 쿼리만 작성
+- [ ] **순수 타입 반환**: Mono/Flux 없이 Entity, List, Boolean 등 순수 타입 반환
+- [ ] **Reactive 변환 금지**: `Mono.fromCallable`, `Flux.from` 등 사용하지 않음
+- [ ] **비즈니스 로직 없음**: 쿼리 실행만 담당
 
 #### Model (모델)
 
@@ -472,13 +671,72 @@ class UserProfileFacade(
 
 ## ✅ 테스트 작성 규칙
 
+### 컨트롤러 테스트 인증 모킹 (OAuth2 Resource Server)
+
+**중요**: 이 프로젝트는 Spring Security OAuth2 Resource Server를 사용하므로, 컨트롤러 테스트에서 인증된 사용자를 모킹할 때는 반드시 `mockUser()` helper function을 사용해야 합니다.
+
+#### mockUser() Helper Function 사용법
+
+**위치**: `src/test/kotlin/me/onetwo/growsnap/util/WebTestClientExtensions.kt`
+
+```kotlin
+import me.onetwo.growsnap.util.mockUser
+
+// 사용 예시
+webTestClient
+    .mutateWith(mockUser(userId))  // 인증된 사용자 모킹
+    .post()
+    .uri("/api/v1/videos")
+    .bodyValue(request)
+    .exchange()
+    .expectStatus().isCreated
+```
+
+**규칙**:
+- ✅ **항상 mockUser() 사용**: 컨트롤러 테스트에서 인증이 필요한 API는 `mockUser(userId)` 사용
+- ✅ **mutateWith() 위치**: HTTP 메서드(post, get 등) 호출 전에 `.mutateWith(mockUser(userId))` 호출
+- ❌ **하드코딩 금지**: `.header(HttpHeaders.AUTHORIZATION, "Bearer ...")` 하드코딩 금지
+- ❌ **순서 주의**: `.post().mutateWith(...)` 순서는 작동하지 않음
+
+#### 잘못된 예시
+
+```kotlin
+// ❌ BAD: Authorization 헤더 하드코딩
+webTestClient.post()
+    .uri("/api/v1/videos")
+    .header(HttpHeaders.AUTHORIZATION, "Bearer test-token-$userId")
+    .exchange()
+
+// ❌ BAD: mutateWith() 호출 순서 틀림
+webTestClient.post()
+    .uri("/api/v1/videos")
+    .mutateWith(mockUser(userId))  // post() 이후에 호출하면 작동하지 않음
+    .exchange()
+```
+
+#### 올바른 예시
+
+```kotlin
+// ✅ GOOD: mockUser() helper function 사용
+val userId = UUID.randomUUID()
+
+webTestClient
+    .mutateWith(mockUser(userId))  // HTTP 메서드 전에 호출
+    .post()
+    .uri("/api/v1/videos")
+    .bodyValue(request)
+    .exchange()
+    .expectStatus().isCreated
+```
+
 ### Controller 테스트 템플릿
 
 ```kotlin
 @WebFluxTest(VideoController::class)
-@Import(SecurityConfig::class, RestDocsConfiguration::class)
+@Import(TestSecurityConfig::class, RestDocsConfiguration::class)
+@ActiveProfiles("test")
 @AutoConfigureRestDocs
-@DisplayName("비디오 컨트롤러 테스트")
+@DisplayName("비디오 Controller 테스트")
 class VideoControllerTest {
 
     @Autowired
@@ -495,12 +753,15 @@ class VideoControllerTest {
         @DisplayName("유효한 요청으로 생성 시, 201 Created와 비디오 정보를 반환한다")
         fun createVideo_WithValidRequest_ReturnsCreatedVideo() {
             // Given: 테스트 데이터 준비
+            val userId = UUID.randomUUID()
             val request = VideoCreateRequest(/* ... */)
             val expected = VideoResponse(/* ... */)
-            every { videoService.createVideo(any()) } returns Mono.just(expected)
+            every { videoService.createVideo(userId, any()) } returns Mono.just(expected)
 
             // When & Then: API 호출 및 검증
-            webTestClient.post()
+            webTestClient
+                .mutateWith(mockUser(userId))  // 인증된 사용자 모킹
+                .post()
                 .uri("/api/v1/videos")
                 .bodyValue(request)
                 .exchange()
@@ -514,14 +775,23 @@ class VideoControllerTest {
                     )
                 )
 
-            verify(exactly = 1) { videoService.createVideo(request) }
+            verify(exactly = 1) { videoService.createVideo(userId, request) }
         }
 
         @Test
         @DisplayName("제목이 비어있는 경우, 400 Bad Request를 반환한다")
         fun createVideo_WithEmptyTitle_ReturnsBadRequest() {
             // Given: 잘못된 요청
+            val userId = UUID.randomUUID()
+
             // When & Then: 400 응답 검증
+            webTestClient
+                .mutateWith(mockUser(userId))
+                .post()
+                .uri("/api/v1/videos")
+                .bodyValue(mapOf("title" to ""))
+                .exchange()
+                .expectStatus().isBadRequest
         }
     }
 }
@@ -531,7 +801,7 @@ class VideoControllerTest {
 
 ```kotlin
 @ExtendWith(MockKExtension::class)
-@DisplayName("비디오 서비스 테스트")
+@DisplayName("비디오 Service 테스트")
 class VideoServiceImplTest {
 
     @MockK

@@ -4,9 +4,9 @@ import me.onetwo.growsnap.domain.feed.dto.FeedResponse
 import me.onetwo.growsnap.domain.feed.service.FeedService
 import me.onetwo.growsnap.infrastructure.common.dto.CursorPageRequest
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 /**
@@ -41,13 +41,16 @@ class FeedController(
      */
     @GetMapping
     fun getMainFeed(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false, defaultValue = "20") limit: Int
     ): Mono<ResponseEntity<FeedResponse>> {
-        val pageRequest = CursorPageRequest(cursor = cursor, limit = limit)
-
-        return feedService.getMainFeed(userId, pageRequest)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                val pageRequest = CursorPageRequest(cursor = cursor, limit = limit)
+                feedService.getMainFeed(userId, pageRequest)
+            }
             .map { ResponseEntity.ok(it) }
     }
 
@@ -67,13 +70,16 @@ class FeedController(
      */
     @GetMapping("/following")
     fun getFollowingFeed(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(required = false, defaultValue = "20") limit: Int
     ): Mono<ResponseEntity<FeedResponse>> {
-        val pageRequest = CursorPageRequest(cursor = cursor, limit = limit)
-
-        return feedService.getFollowingFeed(userId, pageRequest)
+        return principal
+            .map { UUID.fromString(it.name) }
+            .flatMap { userId ->
+                val pageRequest = CursorPageRequest(cursor = cursor, limit = limit)
+                feedService.getFollowingFeed(userId, pageRequest)
+            }
             .map { ResponseEntity.ok(it) }
     }
 }

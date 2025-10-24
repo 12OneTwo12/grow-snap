@@ -33,7 +33,7 @@ import java.util.UUID
  * - 팔로잉 피드
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("피드 서비스 테스트")
+@DisplayName("피드 Service 테스트")
 class FeedServiceImplTest {
 
     private lateinit var feedRepository: FeedRepository

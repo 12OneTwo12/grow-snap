@@ -25,7 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith
  * UserProfileService 단위 테스트
  */
 @ExtendWith(MockKExtension::class)
-@DisplayName("사용자 프로필 서비스 테스트")
+@DisplayName("사용자 프로필 Service 테스트")
 class UserProfileServiceTest {
 
     private lateinit var userProfileRepository: UserProfileRepository

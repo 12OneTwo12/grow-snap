@@ -190,3 +190,91 @@ CREATE INDEX idx_user_interaction_content_id ON user_content_interactions(conten
 CREATE INDEX idx_user_interaction_type ON user_content_interactions(interaction_type);
 CREATE INDEX idx_user_interaction_deleted_at ON user_content_interactions(deleted_at);
 CREATE INDEX idx_user_interaction_composite ON user_content_interactions(user_id, content_id);
+
+-- Comments Table (댓글 및 답글, 최대 depth 2)
+CREATE TABLE IF NOT EXISTS comments (
+    id CHAR(36) PRIMARY KEY,
+    content_id CHAR(36) NOT NULL,
+    user_id CHAR(36) NOT NULL,
+    parent_comment_id CHAR(36) NULL,  -- 답글인 경우 부모 댓글 ID, NULL이면 최상위 댓글
+    content TEXT NOT NULL,
+    timestamp_seconds INT NULL,  -- 타임스탬프 댓글 (초 단위), NULL이면 일반 댓글
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_comment_id) REFERENCES comments(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_comment_content_id ON comments(content_id);
+CREATE INDEX idx_comment_user_id ON comments(user_id);
+CREATE INDEX idx_comment_parent_id ON comments(parent_comment_id);
+CREATE INDEX idx_comment_deleted_at ON comments(deleted_at);
+CREATE INDEX idx_comment_created_at ON comments(created_at);
+
+-- User Likes Table (사용자별 좋아요 상태)
+CREATE TABLE IF NOT EXISTS user_likes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    content_id CHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
+    CONSTRAINT unique_user_like UNIQUE (user_id, content_id)
+);
+
+CREATE INDEX idx_user_like_user_id ON user_likes(user_id);
+CREATE INDEX idx_user_like_content_id ON user_likes(content_id);
+CREATE INDEX idx_user_like_deleted_at ON user_likes(deleted_at);
+CREATE INDEX idx_user_like_composite ON user_likes(user_id, content_id);
+
+-- User Saves Table (사용자별 저장 상태)
+CREATE TABLE IF NOT EXISTS user_saves (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id CHAR(36) NOT NULL,
+    content_id CHAR(36) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (content_id) REFERENCES contents(id) ON DELETE CASCADE,
+    CONSTRAINT unique_user_save UNIQUE (user_id, content_id)
+);
+
+CREATE INDEX idx_user_save_user_id ON user_saves(user_id);
+CREATE INDEX idx_user_save_content_id ON user_saves(content_id);
+CREATE INDEX idx_user_save_deleted_at ON user_saves(deleted_at);
+CREATE INDEX idx_user_save_composite ON user_saves(user_id, content_id);
+CREATE INDEX idx_user_save_created_at ON user_saves(created_at);
+
+-- Reports Table (신고)
+CREATE TABLE IF NOT EXISTS reports (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    reporter_id CHAR(36) NOT NULL,
+    target_type VARCHAR(20) NOT NULL,  -- CONTENT, COMMENT, USER
+    target_id CHAR(36) NOT NULL,
+    reason VARCHAR(50) NOT NULL,  -- SPAM, HARASSMENT, INAPPROPRIATE, COPYRIGHT, OTHER
+    description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',  -- PENDING, APPROVED, REJECTED
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by CHAR(36) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_by CHAR(36) NULL,
+    deleted_at TIMESTAMP NULL,
+    FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_report_reporter_id ON reports(reporter_id);
+CREATE INDEX idx_report_target ON reports(target_type, target_id);
+CREATE INDEX idx_report_status ON reports(status);
+CREATE INDEX idx_report_deleted_at ON reports(deleted_at);
+CREATE INDEX idx_report_created_at ON reports(created_at);

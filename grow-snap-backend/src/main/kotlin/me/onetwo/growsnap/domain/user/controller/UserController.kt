@@ -4,13 +4,13 @@ import me.onetwo.growsnap.domain.user.dto.UserResponse
 import me.onetwo.growsnap.domain.user.service.UserService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 /**
@@ -27,17 +27,15 @@ class UserController(
     /**
      * 내 정보 조회
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @return 사용자 정보
      */
     @GetMapping("/me")
-    fun getMe(
-        @AuthenticationPrincipal userId: UUID
-    ): Mono<ResponseEntity<UserResponse>> {
-        return Mono.fromCallable {
-            val user = userService.getUserById(userId)
-            ResponseEntity.ok(UserResponse.from(user))
-        }
+    fun getMe(principal: Mono<Principal>): Mono<ResponseEntity<UserResponse>> {
+        return principal
+            .map { UUID.fromString(it.name) }
+            .map { userId -> userService.getUserById(userId) }
+            .map { user -> ResponseEntity.ok(UserResponse.from(user)) }
     }
 
     /**
@@ -50,9 +48,9 @@ class UserController(
     fun getUserById(
         @PathVariable targetUserId: UUID
     ): Mono<ResponseEntity<UserResponse>> {
-        return Mono.fromCallable {
-            val user = userService.getUserById(targetUserId)
-            ResponseEntity.ok(UserResponse.from(user))
+        return Mono.defer {
+            Mono.just(userService.getUserById(targetUserId))
+                .map { user -> ResponseEntity.ok(UserResponse.from(user)) }
         }
     }
 
@@ -62,16 +60,14 @@ class UserController(
      * 인증된 사용자를 탈퇴 처리합니다 (Soft Delete).
      * 사용자, 프로필, 팔로우 관계가 모두 삭제됩니다.
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @return 204 No Content
      */
     @DeleteMapping("/me")
-    fun withdrawMe(
-        @AuthenticationPrincipal userId: UUID
-    ): Mono<ResponseEntity<Void>> {
-        return Mono.fromCallable {
-            userService.withdrawUser(userId)
-            ResponseEntity.noContent().build<Void>()
-        }
+    fun withdrawMe(principal: Mono<Principal>): Mono<ResponseEntity<Void>> {
+        return principal
+            .map { UUID.fromString(it.name) }
+            .doOnNext { userId -> userService.withdrawUser(userId) }
+            .map { ResponseEntity.noContent().build<Void>() }
     }
 }

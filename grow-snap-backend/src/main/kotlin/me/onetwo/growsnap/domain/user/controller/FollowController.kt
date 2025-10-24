@@ -6,7 +6,6 @@ import me.onetwo.growsnap.domain.user.dto.FollowStatsResponse
 import me.onetwo.growsnap.domain.user.service.FollowService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import reactor.core.publisher.Mono
+import java.security.Principal
 import java.util.UUID
 
 /**
@@ -30,53 +30,58 @@ class FollowController(
     /**
      * 사용자 팔로우
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @param followingId 팔로우할 사용자 ID
      * @return 생성된 팔로우 관계
      */
     @PostMapping("/{followingId}")
     fun follow(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable followingId: UUID
     ): Mono<ResponseEntity<FollowResponse>> {
-        return Mono.fromCallable {
-            val follow = followService.follow(userId, followingId)
-            ResponseEntity.status(HttpStatus.CREATED).body(FollowResponse.from(follow))
-        }
+        return principal
+            .map { UUID.fromString(it.name) }
+            .map { userId ->
+                val follow = followService.follow(userId, followingId)
+                ResponseEntity.status(HttpStatus.CREATED).body(FollowResponse.from(follow))
+            }
     }
 
     /**
      * 사용자 언팔로우
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @param followingId 언팔로우할 사용자 ID
      */
     @DeleteMapping("/{followingId}")
     fun unfollow(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable followingId: UUID
     ): Mono<ResponseEntity<Void>> {
-        return Mono.fromRunnable<Void> {
-            followService.unfollow(userId, followingId)
-        }.then(Mono.just(ResponseEntity.noContent().build<Void>()))
+        return principal
+            .map { UUID.fromString(it.name) }
+            .doOnNext { userId -> followService.unfollow(userId, followingId) }
+            .map { ResponseEntity.noContent().build<Void>() }
     }
 
     /**
      * 팔로우 관계 확인
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @param followingId 팔로우 대상 사용자 ID
      * @return 팔로우 여부
      */
     @GetMapping("/check/{followingId}")
     fun checkFollowing(
-        @AuthenticationPrincipal userId: UUID,
+        principal: Mono<Principal>,
         @PathVariable followingId: UUID
     ): Mono<ResponseEntity<FollowCheckResponse>> {
-        return Mono.fromCallable {
-            val isFollowing = followService.isFollowing(userId, followingId)
-            ResponseEntity.ok(FollowCheckResponse(userId, followingId, isFollowing))
-        }
+        return principal
+            .map { UUID.fromString(it.name) }
+            .map { userId ->
+                val isFollowing = followService.isFollowing(userId, followingId)
+                ResponseEntity.ok(FollowCheckResponse(userId, followingId, isFollowing))
+            }
     }
 
     /**
@@ -99,17 +104,19 @@ class FollowController(
     /**
      * 내 팔로우 통계 조회
      *
-     * @param userId 인증된 사용자 ID (Spring Security에서 자동 주입)
+     * @param principal 인증된 사용자 Principal (Spring Security에서 자동 주입)
      * @return 팔로워/팔로잉 수
      */
     @GetMapping("/stats/me")
     fun getMyFollowStats(
-        @AuthenticationPrincipal userId: UUID
+        principal: Mono<Principal>
     ): Mono<ResponseEntity<FollowStatsResponse>> {
-        return Mono.fromCallable {
-            val followerCount = followService.getFollowerCount(userId)
-            val followingCount = followService.getFollowingCount(userId)
-            ResponseEntity.ok(FollowStatsResponse(userId, followerCount, followingCount))
-        }
+        return principal
+            .map { UUID.fromString(it.name) }
+            .map { userId ->
+                val followerCount = followService.getFollowerCount(userId)
+                val followingCount = followService.getFollowingCount(userId)
+                ResponseEntity.ok(FollowStatsResponse(userId, followerCount, followingCount))
+            }
     }
 }
