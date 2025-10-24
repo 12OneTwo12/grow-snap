@@ -81,12 +81,12 @@ include::user/get-by-id.adoc[]
 
 사용자 프로필 관리 API
 
-include::profile/create.adoc[]
 include::profile/get-me.adoc[]
 include::profile/get-by-userid.adoc[]
 include::profile/get-by-nickname.adoc[]
 include::profile/update.adoc[]
 include::profile/check-nickname.adoc[]
+include::profile/upload-image.adoc[]
 
 [[follow-api]]
 == Follow API
@@ -98,3 +98,54 @@ include::follow/delete.adoc[]
 include::follow/check.adoc[]
 include::follow/stats-get.adoc[]
 include::follow/stats-get-me.adoc[]
+
+[[feed-api]]
+== Feed API
+
+추천 피드 및 팔로잉 피드 API
+
+include::feed/main.adoc[]
+include::feed/following.adoc[]
+include::feed/refresh.adoc[]
+
+[[like-api]]
+== Like API
+
+콘텐츠 좋아요 관리 API
+
+include::like/create.adoc[]
+include::like/delete.adoc[]
+include::like/count-get.adoc[]
+
+[[comment-api]]
+== Comment API
+
+콘텐츠 댓글 관리 API
+
+include::comment/create.adoc[]
+include::comment/list.adoc[]
+include::comment/delete.adoc[]
+
+[[save-api]]
+== Save API
+
+콘텐츠 저장(북마크) 관리 API
+
+include::save/create.adoc[]
+include::save/delete.adoc[]
+include::save/list.adoc[]
+
+[[share-api]]
+== Share API
+
+콘텐츠 공유 관리 API
+
+include::share/create.adoc[]
+include::share/link-get.adoc[]
+
+[[analytics-api]]
+== Analytics API
+
+사용자 행동 분석 API
+
+include::analytics/view-track.adoc[]
