@@ -284,19 +284,185 @@ class AnalyticsController(
 - ✅ 트랜잭션 관리 (@Transactional)
 - ✅ 복잡한 데이터 처리 (FilePart 처리, 이미지 변환 등)
 - ✅ 다른 서비스 호출 (서비스 간 조율)
-- ✅ Repository 호출 (데이터베이스 접근)
+- ✅ **Repository 호출 (데이터베이스 접근)**
+- ✅ **Mono/Flux 변환 (Repository 결과를 Reactive로 변환)**
 - ✅ 예외 처리 및 변환
 - ❌ HTTP 요청/응답 처리 금지
 - ❌ HTTP 상태 코드 결정 금지
+- ❌ **DSLContext 직접 사용 금지 (JOOQ 쿼리 금지)**
+
+##### Service 계층 규칙 상세
+
+**절대 준수**: Service는 Repository를 통해서만 데이터베이스에 접근합니다.
+
+```kotlin
+// ✅ GOOD: Service가 Repository를 호출하고 Mono/Flux로 변환
+@Service
+class CommentServiceImpl(
+    private val commentRepository: CommentRepository,
+    private val userProfileRepository: UserProfileRepository
+) : CommentService {
+
+    override fun createComment(userId: UUID, contentId: UUID, request: CommentRequest): Mono<CommentResponse> {
+        // Repository 호출 결과를 Mono로 변환
+        return Mono.fromCallable {
+            commentRepository.save(
+                Comment(
+                    contentId = contentId,
+                    userId = userId,
+                    content = request.content
+                )
+            ) ?: throw IllegalStateException("Failed to create comment")
+        }.flatMap { savedComment ->
+            // 사용자 정보도 Repository를 통해 조회
+            Mono.fromCallable {
+                userProfileRepository.findUserInfosByUserIds(setOf(userId))
+            }.map { userInfoMap ->
+                val (nickname, profileImageUrl) = userInfoMap[userId] ?: Pair("Unknown", null)
+                CommentResponse(
+                    id = savedComment.id!!.toString(),
+                    userNickname = nickname,
+                    userProfileImageUrl = profileImageUrl,
+                    content = savedComment.content
+                )
+            }
+        }
+    }
+
+    override fun getComments(contentId: UUID): Flux<CommentResponse> {
+        // Repository 호출 결과를 Flux로 변환
+        return Mono.fromCallable {
+            commentRepository.findByContentId(contentId)
+        }.flatMapMany { comments ->
+            val userIds = comments.map { it.userId }.toSet()
+
+            Mono.fromCallable {
+                userProfileRepository.findUserInfosByUserIds(userIds)
+            }.flatMapMany { userInfoMap ->
+                Flux.fromIterable(comments).map { comment ->
+                    val userInfo = userInfoMap[comment.userId] ?: Pair("Unknown", null)
+                    mapToCommentResponse(comment, userInfo)
+                }
+            }
+        }
+    }
+}
+
+// ❌ BAD: Service가 DSLContext를 직접 사용 (JOOQ 쿼리 실행)
+@Service
+class CommentServiceImpl(
+    private val commentRepository: CommentRepository,
+    private val dslContext: DSLContext  // ❌ Service에서 DSLContext 직접 사용
+) : CommentService {
+
+    override fun createComment(userId: UUID, contentId: UUID, request: CommentRequest): Mono<CommentResponse> {
+        return commentRepository.save(comment)
+            .flatMap { savedComment ->
+                // ❌ Service에서 JOOQ 쿼리 직접 실행 (Repository 역할 침범)
+                Mono.fromCallable {
+                    dslContext
+                        .select(USER_PROFILES.NICKNAME, USER_PROFILES.PROFILE_IMAGE_URL)
+                        .from(USER_PROFILES)
+                        .where(USER_PROFILES.USER_ID.eq(userId.toString()))
+                        .fetchOne()
+                        ?.let {
+                            Pair(
+                                it.getValue(USER_PROFILES.NICKNAME) ?: "Unknown",
+                                it.getValue(USER_PROFILES.PROFILE_IMAGE_URL)
+                            )
+                        }
+                }.map { (nickname, profileImageUrl) ->
+                    CommentResponse(
+                        id = savedComment.id!!.toString(),
+                        userNickname = nickname,
+                        userProfileImageUrl = profileImageUrl
+                    )
+                }
+            }
+    }
+}
+```
+
+**Service 체크리스트**:
+- [ ] **Repository만 호출**: 데이터베이스 접근은 Repository를 통해서만
+- [ ] **DSLContext 사용 금지**: Service에서 JOOQ 쿼리 직접 실행 금지
+- [ ] **Mono/Flux 변환**: Repository 결과를 `Mono.fromCallable`로 변환
+- [ ] **비즈니스 로직**: Repository를 조합하여 비즈니스 로직 구현
 
 #### Repository (레포지토리)
 
 **역할**: 데이터베이스 CRUD
 
-- ✅ 데이터베이스 쿼리 실행 (JOOQ 사용)
+- ✅ 데이터베이스 쿼리 실행 (JOOQ만 사용)
 - ✅ Entity 저장/조회/수정/삭제
+- ✅ 순수한 타입 반환 (Entity, List, Boolean 등)
+- ❌ **Mono/Flux 반환 금지** (Service에서 변환)
 - ❌ 비즈니스 로직 금지
 - ❌ 다른 Repository 호출 최소화
+
+##### Repository 계층 규칙 상세
+
+**절대 준수**: Repository는 JOOQ를 사용한 순수한 데이터베이스 쿼리만 작성합니다.
+
+```kotlin
+// ✅ GOOD: Repository는 순수 타입 반환
+@Repository
+class CommentRepositoryImpl(
+    private val dslContext: DSLContext
+) : CommentRepository {
+
+    override fun save(comment: Comment): Comment? {
+        return dslContext
+            .insertInto(COMMENTS)
+            .set(COMMENTS.ID, comment.id.toString())
+            .set(COMMENTS.CONTENT, comment.content)
+            .returning()
+            .fetchOne()
+            ?.let { recordToComment(it) }
+    }
+
+    override fun findById(commentId: UUID): Comment? {
+        return dslContext
+            .select(COMMENTS.ID, COMMENTS.CONTENT)
+            .from(COMMENTS)
+            .where(COMMENTS.ID.eq(commentId.toString()))
+            .and(COMMENTS.DELETED_AT.isNull)
+            .fetchOne()
+            ?.let { recordToComment(it) }
+    }
+
+    override fun findByContentId(contentId: UUID): List<Comment> {
+        return dslContext
+            .select(COMMENTS.ID, COMMENTS.CONTENT)
+            .from(COMMENTS)
+            .where(COMMENTS.CONTENT_ID.eq(contentId.toString()))
+            .and(COMMENTS.DELETED_AT.isNull)
+            .fetch()
+            .map { recordToComment(it) }
+    }
+}
+
+// ❌ BAD: Repository가 Mono/Flux 반환
+@Repository
+class CommentRepositoryImpl(
+    private val dslContext: DSLContext
+) : CommentRepository {
+
+    override fun save(comment: Comment): Mono<Comment> {
+        return Mono.fromCallable {
+            dslContext.insertInto(COMMENTS)
+                .set(COMMENTS.ID, comment.id.toString())
+                .execute()
+        }.map { comment }
+    }
+}
+```
+
+**Repository 체크리스트**:
+- [ ] **JOOQ만 사용**: DSLContext를 사용한 순수한 쿼리만 작성
+- [ ] **순수 타입 반환**: Mono/Flux 없이 Entity, List, Boolean 등 순수 타입 반환
+- [ ] **Reactive 변환 금지**: `Mono.fromCallable`, `Flux.from` 등 사용하지 않음
+- [ ] **비즈니스 로직 없음**: 쿼리 실행만 담당
 
 #### Model (모델)
 
