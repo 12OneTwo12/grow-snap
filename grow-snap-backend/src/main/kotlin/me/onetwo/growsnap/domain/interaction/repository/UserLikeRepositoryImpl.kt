@@ -4,7 +4,6 @@ import me.onetwo.growsnap.domain.interaction.model.UserLike
 import me.onetwo.growsnap.jooq.generated.tables.UserLikes.Companion.USER_LIKES
 import org.jooq.DSLContext
 import org.springframework.stereotype.Repository
-import reactor.core.publisher.Mono
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -12,6 +11,7 @@ import java.util.UUID
  * 사용자 좋아요 레포지토리 구현체
  *
  * JOOQ를 사용하여 user_likes 테이블에 접근합니다.
+ * Reactive 변환은 Service 계층에서 처리합니다.
  *
  * @property dslContext JOOQ DSLContext
  */
@@ -35,33 +35,31 @@ class UserLikeRepositoryImpl(
      * @param contentId 콘텐츠 ID
      * @return 생성된 좋아요
      */
-    override fun save(userId: UUID, contentId: UUID): Mono<UserLike> {
-        return Mono.fromCallable {
-            val now = LocalDateTime.now()
+    override fun save(userId: UUID, contentId: UUID): UserLike? {
+        val now = LocalDateTime.now()
 
-            dslContext
-                .insertInto(USER_LIKES)
-                .set(USER_LIKES.USER_ID, userId.toString())
-                .set(USER_LIKES.CONTENT_ID, contentId.toString())
-                .set(USER_LIKES.CREATED_AT, now)
-                .set(USER_LIKES.CREATED_BY, userId.toString())
-                .set(USER_LIKES.UPDATED_AT, now)
-                .set(USER_LIKES.UPDATED_BY, userId.toString())
-                .returning()
-                .fetchOne()
-                ?.let {
-                    UserLike(
-                        id = it.getValue(USER_LIKES.ID),
-                        userId = UUID.fromString(it.getValue(USER_LIKES.USER_ID)),
-                        contentId = UUID.fromString(it.getValue(USER_LIKES.CONTENT_ID)),
-                        createdAt = it.getValue(USER_LIKES.CREATED_AT)!!,
-                        createdBy = it.getValue(USER_LIKES.CREATED_BY)?.let { UUID.fromString(it) },
-                        updatedAt = it.getValue(USER_LIKES.UPDATED_AT)!!,
-                        updatedBy = it.getValue(USER_LIKES.UPDATED_BY)?.let { UUID.fromString(it) },
-                        deletedAt = it.getValue(USER_LIKES.DELETED_AT)
-                    )
-                } ?: throw IllegalStateException("Failed to create user like")
-        }
+        return dslContext
+            .insertInto(USER_LIKES)
+            .set(USER_LIKES.USER_ID, userId.toString())
+            .set(USER_LIKES.CONTENT_ID, contentId.toString())
+            .set(USER_LIKES.CREATED_AT, now)
+            .set(USER_LIKES.CREATED_BY, userId.toString())
+            .set(USER_LIKES.UPDATED_AT, now)
+            .set(USER_LIKES.UPDATED_BY, userId.toString())
+            .returning()
+            .fetchOne()
+            ?.let {
+                UserLike(
+                    id = it.getValue(USER_LIKES.ID),
+                    userId = UUID.fromString(it.getValue(USER_LIKES.USER_ID)),
+                    contentId = UUID.fromString(it.getValue(USER_LIKES.CONTENT_ID)),
+                    createdAt = it.getValue(USER_LIKES.CREATED_AT)!!,
+                    createdBy = it.getValue(USER_LIKES.CREATED_BY)?.let { UUID.fromString(it) },
+                    updatedAt = it.getValue(USER_LIKES.UPDATED_AT)!!,
+                    updatedBy = it.getValue(USER_LIKES.UPDATED_BY)?.let { UUID.fromString(it) },
+                    deletedAt = it.getValue(USER_LIKES.DELETED_AT)
+                )
+            }
     }
 
     /**
@@ -77,22 +75,19 @@ class UserLikeRepositoryImpl(
      *
      * @param userId 사용자 ID
      * @param contentId 콘텐츠 ID
-     * @return 처리 완료 신호
      */
-    override fun delete(userId: UUID, contentId: UUID): Mono<Void> {
-        return Mono.fromCallable {
-            val now = LocalDateTime.now()
+    override fun delete(userId: UUID, contentId: UUID) {
+        val now = LocalDateTime.now()
 
-            dslContext
-                .update(USER_LIKES)
-                .set(USER_LIKES.DELETED_AT, now)
-                .set(USER_LIKES.UPDATED_AT, now)
-                .set(USER_LIKES.UPDATED_BY, userId.toString())
-                .where(USER_LIKES.USER_ID.eq(userId.toString()))
-                .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
-                .and(USER_LIKES.DELETED_AT.isNull)
-                .execute()
-        }.then()
+        dslContext
+            .update(USER_LIKES)
+            .set(USER_LIKES.DELETED_AT, now)
+            .set(USER_LIKES.UPDATED_AT, now)
+            .set(USER_LIKES.UPDATED_BY, userId.toString())
+            .where(USER_LIKES.USER_ID.eq(userId.toString()))
+            .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
+            .and(USER_LIKES.DELETED_AT.isNull)
+            .execute()
     }
 
     /**
@@ -104,16 +99,14 @@ class UserLikeRepositoryImpl(
      * @param contentId 콘텐츠 ID
      * @return 좋아요 여부
      */
-    override fun exists(userId: UUID, contentId: UUID): Mono<Boolean> {
-        return Mono.fromCallable {
-            dslContext
-                .selectCount()
-                .from(USER_LIKES)
-                .where(USER_LIKES.USER_ID.eq(userId.toString()))
-                .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
-                .and(USER_LIKES.DELETED_AT.isNull)
-                .fetchOne(0, Int::class.java) ?: 0 > 0
-        }
+    override fun exists(userId: UUID, contentId: UUID): Boolean {
+        return dslContext
+            .selectCount()
+            .from(USER_LIKES)
+            .where(USER_LIKES.USER_ID.eq(userId.toString()))
+            .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
+            .and(USER_LIKES.DELETED_AT.isNull)
+            .fetchOne(0, Int::class.java) ?: 0 > 0
     }
 
     /**
@@ -123,38 +116,36 @@ class UserLikeRepositoryImpl(
      *
      * @param userId 사용자 ID
      * @param contentId 콘텐츠 ID
-     * @return 좋아요 (없으면 empty)
+     * @return 좋아요 (없으면 null)
      */
-    override fun findByUserIdAndContentId(userId: UUID, contentId: UUID): Mono<UserLike> {
-        return Mono.fromCallable {
-            dslContext
-                .select(
-                    USER_LIKES.ID,
-                    USER_LIKES.USER_ID,
-                    USER_LIKES.CONTENT_ID,
-                    USER_LIKES.CREATED_AT,
-                    USER_LIKES.CREATED_BY,
-                    USER_LIKES.UPDATED_AT,
-                    USER_LIKES.UPDATED_BY,
-                    USER_LIKES.DELETED_AT
+    override fun findByUserIdAndContentId(userId: UUID, contentId: UUID): UserLike? {
+        return dslContext
+            .select(
+                USER_LIKES.ID,
+                USER_LIKES.USER_ID,
+                USER_LIKES.CONTENT_ID,
+                USER_LIKES.CREATED_AT,
+                USER_LIKES.CREATED_BY,
+                USER_LIKES.UPDATED_AT,
+                USER_LIKES.UPDATED_BY,
+                USER_LIKES.DELETED_AT
+            )
+            .from(USER_LIKES)
+            .where(USER_LIKES.USER_ID.eq(userId.toString()))
+            .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
+            .and(USER_LIKES.DELETED_AT.isNull)
+            .fetchOne()
+            ?.let {
+                UserLike(
+                    id = it.getValue(USER_LIKES.ID),
+                    userId = UUID.fromString(it.getValue(USER_LIKES.USER_ID)),
+                    contentId = UUID.fromString(it.getValue(USER_LIKES.CONTENT_ID)),
+                    createdAt = it.getValue(USER_LIKES.CREATED_AT)!!,
+                    createdBy = it.getValue(USER_LIKES.CREATED_BY)?.let { UUID.fromString(it) },
+                    updatedAt = it.getValue(USER_LIKES.UPDATED_AT)!!,
+                    updatedBy = it.getValue(USER_LIKES.UPDATED_BY)?.let { UUID.fromString(it) },
+                    deletedAt = it.getValue(USER_LIKES.DELETED_AT)
                 )
-                .from(USER_LIKES)
-                .where(USER_LIKES.USER_ID.eq(userId.toString()))
-                .and(USER_LIKES.CONTENT_ID.eq(contentId.toString()))
-                .and(USER_LIKES.DELETED_AT.isNull)
-                .fetchOne()
-                ?.let {
-                    UserLike(
-                        id = it.getValue(USER_LIKES.ID),
-                        userId = UUID.fromString(it.getValue(USER_LIKES.USER_ID)),
-                        contentId = UUID.fromString(it.getValue(USER_LIKES.CONTENT_ID)),
-                        createdAt = it.getValue(USER_LIKES.CREATED_AT)!!,
-                        createdBy = it.getValue(USER_LIKES.CREATED_BY)?.let { UUID.fromString(it) },
-                        updatedAt = it.getValue(USER_LIKES.UPDATED_AT)!!,
-                        updatedBy = it.getValue(USER_LIKES.UPDATED_BY)?.let { UUID.fromString(it) },
-                        deletedAt = it.getValue(USER_LIKES.DELETED_AT)
-                    )
-                }
-        }.flatMap { Mono.justOrEmpty(it) }
+            }
     }
 }

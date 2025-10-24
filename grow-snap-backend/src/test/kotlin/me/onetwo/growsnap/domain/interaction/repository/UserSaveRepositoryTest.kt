@@ -26,16 +26,16 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * UserLikeRepository 통합 테스트
+ * UserSaveRepository 통합 테스트
  */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-@DisplayName("UserLikeRepository 통합 테스트")
-class UserLikeRepositoryTest {
+@DisplayName("UserSaveRepository 통합 테스트")
+class UserSaveRepositoryTest {
 
     @Autowired
-    private lateinit var userLikeRepository: UserLikeRepository
+    private lateinit var userSaveRepository: UserSaveRepository
 
     @Autowired
     private lateinit var userRepository: UserRepository
@@ -65,33 +65,33 @@ class UserLikeRepositoryTest {
     }
 
     @Nested
-    @DisplayName("save - 좋아요 생성")
+    @DisplayName("save - 저장 생성")
     inner class Save {
 
         @Test
-        @DisplayName("좋아요를 생성하면, user_likes 테이블에 레코드가 저장된다")
-        fun save_CreatesUserLike() {
+        @DisplayName("저장을 생성하면, user_saves 테이블에 레코드가 저장된다")
+        fun save_CreatesUserSave() {
             // Given: 준비된 사용자와 콘텐츠
 
-            // When: 좋아요 생성
-            val userLike = userLikeRepository.save(testUserId, testContentId)!!
+            // When: 저장 생성
+            val userSave = userSaveRepository.save(testUserId, testContentId)!!
 
-            // Then: 생성된 좋아요 검증
-            assertEquals(testUserId, userLike.userId)
-            assertEquals(testContentId, userLike.contentId)
-            assertEquals(testUserId, userLike.createdBy)
-            assertEquals(testUserId, userLike.updatedBy)
+            // Then: 생성된 저장 검증
+            assertEquals(testUserId, userSave.userId)
+            assertEquals(testContentId, userSave.contentId)
+            assertEquals(testUserId, userSave.createdBy)
+            assertEquals(testUserId, userSave.updatedBy)
         }
 
         @Test
-        @DisplayName("이미 좋아요가 존재하면, 중복 생성 시 예외가 발생한다")
+        @DisplayName("이미 저장이 존재하면, 중복 생성 시 예외가 발생한다")
         fun save_WhenAlreadyExists_ThrowsException() {
-            // Given: 이미 좋아요가 존재
-            userLikeRepository.save(testUserId, testContentId)
+            // Given: 이미 저장이 존재
+            userSaveRepository.save(testUserId, testContentId)
 
             // When & Then: 중복 생성 시 예외 발생
             try {
-                userLikeRepository.save(testUserId, testContentId)
+                userSaveRepository.save(testUserId, testContentId)
                 assert(false) { "Expected exception but none was thrown" }
             } catch (e: Exception) {
                 // 예외 발생 확인 (duplicate, unique constraint violation 등)
@@ -107,71 +107,71 @@ class UserLikeRepositoryTest {
     }
 
     @Nested
-    @DisplayName("delete - 좋아요 삭제")
+    @DisplayName("delete - 저장 삭제")
     inner class Delete {
 
         @Test
-        @DisplayName("좋아요를 삭제하면, deleted_at이 설정된다")
+        @DisplayName("저장을 삭제하면, deleted_at이 설정된다")
         fun delete_SetDeletedAt() {
-            // Given: 좋아요가 존재
-            userLikeRepository.save(testUserId, testContentId)
+            // Given: 저장이 존재
+            userSaveRepository.save(testUserId, testContentId)
 
-            // When: 좋아요 삭제
-            userLikeRepository.delete(testUserId, testContentId)
+            // When: 저장 삭제
+            userSaveRepository.delete(testUserId, testContentId)
 
             // Then: deleted_at이 설정됨
-            val exists = userLikeRepository.exists(testUserId, testContentId)
+            val exists = userSaveRepository.exists(testUserId, testContentId)
             assertFalse(exists)
         }
 
         @Test
-        @DisplayName("존재하지 않는 좋아요를 삭제해도, 예외가 발생하지 않는다")
+        @DisplayName("존재하지 않는 저장을 삭제해도, 예외가 발생하지 않는다")
         fun delete_WhenNotExists_DoesNotThrow() {
-            // Given: 좋아요가 존재하지 않음
+            // Given: 저장이 존재하지 않음
 
             // When & Then: 삭제해도 예외 없음
-            userLikeRepository.delete(testUserId, testContentId)
+            userSaveRepository.delete(testUserId, testContentId)
         }
     }
 
     @Nested
-    @DisplayName("exists - 좋아요 존재 여부 확인")
+    @DisplayName("exists - 저장 존재 여부 확인")
     inner class Exists {
 
         @Test
-        @DisplayName("좋아요가 존재하면, true를 반환한다")
+        @DisplayName("저장이 존재하면, true를 반환한다")
         fun exists_WhenExists_ReturnsTrue() {
-            // Given: 좋아요가 존재
-            userLikeRepository.save(testUserId, testContentId)
+            // Given: 저장이 존재
+            userSaveRepository.save(testUserId, testContentId)
 
             // When: 존재 여부 확인
-            val exists = userLikeRepository.exists(testUserId, testContentId)
+            val exists = userSaveRepository.exists(testUserId, testContentId)
 
             // Then: true 반환
             assertTrue(exists)
         }
 
         @Test
-        @DisplayName("좋아요가 존재하지 않으면, false를 반환한다")
+        @DisplayName("저장이 존재하지 않으면, false를 반환한다")
         fun exists_WhenNotExists_ReturnsFalse() {
-            // Given: 좋아요가 존재하지 않음
+            // Given: 저장이 존재하지 않음
 
             // When: 존재 여부 확인
-            val exists = userLikeRepository.exists(testUserId, testContentId)
+            val exists = userSaveRepository.exists(testUserId, testContentId)
 
             // Then: false 반환
             assertFalse(exists)
         }
 
         @Test
-        @DisplayName("삭제된 좋아요는, false를 반환한다")
+        @DisplayName("삭제된 저장은, false를 반환한다")
         fun exists_WhenDeleted_ReturnsFalse() {
-            // Given: 좋아요가 삭제됨
-            userLikeRepository.save(testUserId, testContentId)
-            userLikeRepository.delete(testUserId, testContentId)
+            // Given: 저장이 삭제됨
+            userSaveRepository.save(testUserId, testContentId)
+            userSaveRepository.delete(testUserId, testContentId)
 
             // When: 존재 여부 확인
-            val exists = userLikeRepository.exists(testUserId, testContentId)
+            val exists = userSaveRepository.exists(testUserId, testContentId)
 
             // Then: false 반환
             assertFalse(exists)
@@ -179,33 +179,55 @@ class UserLikeRepositoryTest {
     }
 
     @Nested
-    @DisplayName("findByUserIdAndContentId - 사용자의 좋아요 조회")
-    inner class FindByUserIdAndContentId {
+    @DisplayName("findByUserId - 사용자의 저장 목록 조회")
+    inner class FindByUserId {
 
         @Test
-        @DisplayName("좋아요가 존재하면, 좋아요를 반환한다")
-        fun findByUserIdAndContentId_WhenExists_ReturnsUserLike() {
-            // Given: 좋아요가 존재
-            userLikeRepository.save(testUserId, testContentId)
+        @DisplayName("사용자의 저장을 조회하면, 생성일시 내림차순으로 반환한다")
+        fun findByUserId_ReturnsOrderedByCreatedAtDesc() {
+            // Given: 2개의 콘텐츠를 저장
+            val contentId1 = UUID.randomUUID()
+            val contentId2 = UUID.randomUUID()
+            insertContent(contentId1, testUserId, "Content 1")
+            insertContent(contentId2, testUserId, "Content 2")
 
-            // When: 좋아요 조회
-            val userLike = userLikeRepository.findByUserIdAndContentId(testUserId, testContentId)
+            userSaveRepository.save(testUserId, contentId1)
+            Thread.sleep(10) // 생성 시간 차이를 위해 대기
+            userSaveRepository.save(testUserId, contentId2)
 
-            // Then: 좋아요 반환
-            assertEquals(testUserId, userLike?.userId)
-            assertEquals(testContentId, userLike?.contentId)
+            // When: 저장 목록 조회
+            val userSaves = userSaveRepository.findByUserId(testUserId)
+
+            // Then: 최신순으로 반환
+            assertEquals(2, userSaves.size)
+            assertEquals(contentId2, userSaves[0].contentId) // 최신
+            assertEquals(contentId1, userSaves[1].contentId) // 이전
         }
 
         @Test
-        @DisplayName("좋아요가 존재하지 않으면, null을 반환한다")
-        fun findByUserIdAndContentId_WhenNotExists_ReturnsNull() {
-            // Given: 좋아요가 존재하지 않음
+        @DisplayName("삭제된 저장은 조회되지 않는다")
+        fun findByUserId_ExcludesDeleted() {
+            // Given: 저장 후 삭제
+            userSaveRepository.save(testUserId, testContentId)
+            userSaveRepository.delete(testUserId, testContentId)
 
-            // When: 좋아요 조회
-            val userLike = userLikeRepository.findByUserIdAndContentId(testUserId, testContentId)
+            // When: 저장 목록 조회
+            val userSaves = userSaveRepository.findByUserId(testUserId)
 
-            // Then: null 반환
-            assertNull(userLike)
+            // Then: 삭제된 저장은 조회되지 않음
+            assertEquals(0, userSaves.size)
+        }
+
+        @Test
+        @DisplayName("저장이 없으면, 빈 목록을 반환한다")
+        fun findByUserId_WhenEmpty_ReturnsEmptyList() {
+            // Given: 저장이 없음
+
+            // When: 저장 목록 조회
+            val userSaves = userSaveRepository.findByUserId(testUserId)
+
+            // Then: 빈 목록 반환
+            assertEquals(0, userSaves.size)
         }
     }
 

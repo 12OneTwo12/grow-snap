@@ -15,6 +15,7 @@ import org.jooq.DSLContext
 import org.jooq.JSON
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -77,7 +78,7 @@ class CommentRepositoryTest {
             )
 
             // When: 댓글 저장
-            val saved = commentRepository.save(comment).block()
+            val saved = commentRepository.save(comment)
 
             // Then: 저장된 댓글 확인
             assertNotNull(saved)
@@ -100,7 +101,7 @@ class CommentRepositoryTest {
             )
 
             // When: 저장
-            val saved = commentRepository.save(comment).block()
+            val saved = commentRepository.save(comment)
 
             // Then: 타임스탬프 확인
             assertNotNull(saved)
@@ -119,7 +120,7 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             // 대댓글 생성
             val reply = Comment(
@@ -131,7 +132,7 @@ class CommentRepositoryTest {
             )
 
             // When: 대댓글 저장
-            val saved = commentRepository.save(reply).block()
+            val saved = commentRepository.save(reply)
 
             // Then: parentCommentId 확인
             assertNotNull(saved)
@@ -155,10 +156,10 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             // When: ID로 조회
-            val found = commentRepository.findById(comment!!.id!!).block()
+            val found = commentRepository.findById(comment!!.id!!)
 
             // Then: 댓글 반환 확인
             assertNotNull(found)
@@ -167,16 +168,16 @@ class CommentRepositoryTest {
         }
 
         @Test
-        @DisplayName("존재하지 않는 ID로 조회하면, empty Mono가 반환된다")
-        fun findById_NonExistingId_ReturnsEmpty() {
+        @DisplayName("존재하지 않는 ID로 조회하면, null이 반환된다")
+        fun findById_NonExistingId_ReturnsNull() {
             // Given: 존재하지 않는 ID
             val nonExistingId = UUID.randomUUID()
 
             // When: 조회
-            val found = commentRepository.findById(nonExistingId).block()
+            val found = commentRepository.findById(nonExistingId)
 
             // Then: null 반환
-            assertEquals(null, found)
+            assertNull(found)
         }
     }
 
@@ -196,7 +197,7 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             Thread.sleep(10) // 생성 시간 차이를 위해 대기
 
@@ -208,7 +209,7 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             Thread.sleep(10)
 
@@ -220,14 +221,14 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             // When: 댓글 목록 조회
-            val comments = commentRepository.findByContentId(testContentId).collectList().block()
+            val comments = commentRepository.findByContentId(testContentId)
 
             // Then: 3개의 댓글이 생성 시간 순서대로 반환
             assertNotNull(comments)
-            assertEquals(3, comments!!.size)
+            assertEquals(3, comments.size)
             assertEquals("First comment", comments[0].content)
             assertEquals("Second comment", comments[1].content)
             assertEquals("Third comment", comments[2].content)
@@ -245,16 +246,16 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
-            commentRepository.delete(comment!!.id!!, testUser.id!!).block()
+            commentRepository.delete(comment!!.id!!, testUser.id!!)
 
             // When: 댓글 목록 조회
-            val comments = commentRepository.findByContentId(testContentId).collectList().block()
+            val comments = commentRepository.findByContentId(testContentId)
 
             // Then: 삭제된 댓글은 조회되지 않음
             assertNotNull(comments)
-            assertEquals(0, comments!!.size)
+            assertEquals(0, comments.size)
         }
     }
 
@@ -274,7 +275,7 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             // 대댓글 2개 생성
             commentRepository.save(
@@ -285,7 +286,7 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = parentComment!!.id
                 )
-            ).block()
+            )
 
             commentRepository.save(
                 Comment(
@@ -295,14 +296,14 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = parentComment.id
                 )
-            ).block()
+            )
 
             // When: 대댓글 조회
-            val replies = commentRepository.findByParentCommentId(parentComment.id!!).collectList().block()
+            val replies = commentRepository.findByParentCommentId(parentComment.id!!)
 
             // Then: 2개의 대댓글 반환
             assertNotNull(replies)
-            assertEquals(2, replies!!.size)
+            assertEquals(2, replies.size)
         }
     }
 
@@ -322,14 +323,14 @@ class CommentRepositoryTest {
                     timestampSeconds = null,
                     parentCommentId = null
                 )
-            ).block()
+            )
 
             // When: 댓글 삭제
-            commentRepository.delete(comment!!.id!!, testUser.id!!).block()
+            commentRepository.delete(comment!!.id!!, testUser.id!!)
 
             // Then: findById로 조회되지 않음 (deletedAt이 설정됨)
-            val found = commentRepository.findById(comment.id!!).block()
-            assertEquals(null, found)
+            val found = commentRepository.findById(comment.id!!)
+            assertNull(found)
         }
     }
 
