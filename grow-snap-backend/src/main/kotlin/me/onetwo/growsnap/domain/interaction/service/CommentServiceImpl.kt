@@ -9,8 +9,7 @@ import me.onetwo.growsnap.domain.interaction.dto.CommentResponse
 import me.onetwo.growsnap.domain.interaction.exception.CommentException
 import me.onetwo.growsnap.domain.interaction.model.Comment
 import me.onetwo.growsnap.domain.interaction.repository.CommentRepository
-import me.onetwo.growsnap.jooq.generated.tables.UserProfiles.Companion.USER_PROFILES
-import org.jooq.DSLContext
+import me.onetwo.growsnap.domain.user.repository.UserProfileRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
@@ -32,14 +31,14 @@ import java.util.UUID
  * @property commentRepository 댓글 레포지토리
  * @property analyticsService Analytics 서비스 (이벤트 발행)
  * @property contentInteractionRepository 콘텐츠 인터랙션 레포지토리
- * @property dslContext JOOQ DSL Context
+ * @property userProfileRepository 사용자 프로필 레포지토리
  */
 @Service
 class CommentServiceImpl(
     private val commentRepository: CommentRepository,
     private val analyticsService: AnalyticsService,
     private val contentInteractionRepository: ContentInteractionRepository,
-    private val dslContext: DSLContext
+    private val userProfileRepository: UserProfileRepository
 ) : CommentService {
 
     /**
@@ -62,32 +61,31 @@ class CommentServiceImpl(
     override fun createComment(userId: UUID, contentId: UUID, request: CommentRequest): Mono<CommentResponse> {
         logger.debug("Creating comment: userId={}, contentId={}", userId, contentId)
 
-        // 대댓글인 경우 부모 댓글 존재 확인
         val parentCommentId = request.parentCommentId?.let { UUID.fromString(it) }
-        val validateParent = if (parentCommentId != null) {
-            commentRepository.findById(parentCommentId)
-                .switchIfEmpty(
-                    Mono.error(CommentException.ParentCommentNotFoundException(parentCommentId))
-                )
-                .then()
+        val validateParent: Mono<Void> = if (parentCommentId != null) {
+            Mono.fromCallable {
+                commentRepository.findById(parentCommentId)
+                    ?: throw CommentException.ParentCommentNotFoundException(parentCommentId)
+            }.then()
         } else {
             Mono.empty()
         }
 
         return validateParent
             .then(
-                commentRepository.save(
-                    Comment(
-                        contentId = contentId,
-                        userId = userId,
-                        parentCommentId = parentCommentId,
-                        content = request.content,
-                        timestampSeconds = request.timestampSeconds
-                    )
-                )
+                Mono.fromCallable {
+                    commentRepository.save(
+                        Comment(
+                            contentId = contentId,
+                            userId = userId,
+                            parentCommentId = parentCommentId,
+                            content = request.content,
+                            timestampSeconds = request.timestampSeconds
+                        )
+                    ) ?: throw IllegalStateException("Failed to create comment")
+                }
             )
-            .flatMap { savedComment ->
-                // AnalyticsService로 이벤트 발행 (카운터 증가 + user_content_interactions 저장)
+            .flatMap { savedComment: Comment ->
                 analyticsService.trackInteractionEvent(
                     userId,
                     InteractionEventRequest(
@@ -97,8 +95,11 @@ class CommentServiceImpl(
                 )
                     .then(Mono.just(savedComment))
             }
-            .flatMap { savedComment ->
-                getUserInfo(userId).map { (nickname, profileImageUrl) ->
+            .flatMap { savedComment: Comment ->
+                Mono.fromCallable {
+                    userProfileRepository.findUserInfosByUserIds(setOf(userId))
+                }.map { userInfoMap ->
+                    val (nickname, profileImageUrl) = userInfoMap[userId] ?: Pair("Unknown", null)
                     CommentResponse(
                         id = savedComment.id!!.toString(),
                         contentId = savedComment.contentId.toString(),
@@ -112,7 +113,7 @@ class CommentServiceImpl(
                     )
                 }
             }
-            .doOnSuccess { logger.debug("Comment created successfully: commentId={}", it.id) }
+            .doOnSuccess { response -> logger.debug("Comment created successfully: commentId={}", response.id) }
             .doOnError { error ->
                 logger.error("Failed to create comment: userId={}, contentId={}", userId, contentId, error)
             }
@@ -125,10 +126,13 @@ class CommentServiceImpl(
     /**
      * 콘텐츠의 댓글 목록 조회
      *
+     * N+1 쿼리 문제를 방지하기 위해 모든 사용자 정보를 한 번에 조회합니다.
+     *
      * ### 처리 흐름
      * 1. comments 테이블에서 해당 콘텐츠의 모든 댓글 조회
-     * 2. user_profiles와 조인하여 작성자 정보 포함
-     * 3. 계층 구조로 변환 (부모 댓글 - 대댓글)
+     * 2. 모든 작성자 ID를 수집
+     * 3. UserProfileRepository로 사용자 정보 일괄 조회 (N+1 문제 해결)
+     * 4. 메모리에서 데이터 조합하여 계층 구조 생성 (부모 댓글 - 대댓글)
      *
      * @param contentId 콘텐츠 ID
      * @return 댓글 목록 (계층 구조)
@@ -136,48 +140,33 @@ class CommentServiceImpl(
     override fun getComments(contentId: UUID): Flux<CommentResponse> {
         logger.debug("Getting comments: contentId={}", contentId)
 
-        return commentRepository.findByContentId(contentId)
-            .collectList()
+        return Mono.fromCallable { commentRepository.findByContentId(contentId) }
             .flatMapMany { comments ->
-                val parentComments = comments.filter { it.parentCommentId == null }
+                if (comments.isEmpty()) {
+                    return@flatMapMany Flux.empty()
+                }
 
-                Flux.fromIterable(parentComments)
-                    .flatMap { parentComment ->
-                        getUserInfo(parentComment.userId).flatMap { (nickname, profileImageUrl) ->
-                            val replies = comments
-                                .filter { it.parentCommentId == parentComment.id }
-                                .map { reply ->
-                                    val (replyNickname, replyProfileImageUrl) = getUserInfo(reply.userId).block()
-                                        ?: Pair("Unknown", null)
-                                    CommentResponse(
-                                        id = reply.id!!.toString(),
-                                        contentId = reply.contentId.toString(),
-                                        userId = reply.userId.toString(),
-                                        userNickname = replyNickname,
-                                        userProfileImageUrl = replyProfileImageUrl,
-                                        content = reply.content,
-                                        timestampSeconds = reply.timestampSeconds,
-                                        parentCommentId = reply.parentCommentId?.toString(),
-                                        createdAt = reply.createdAt.toString()
-                                    )
-                                }
+                val userIds = comments.map { it.userId }.toSet()
 
-                            Mono.just(
-                                CommentResponse(
-                                    id = parentComment.id!!.toString(),
-                                    contentId = parentComment.contentId.toString(),
-                                    userId = parentComment.userId.toString(),
-                                    userNickname = nickname,
-                                    userProfileImageUrl = profileImageUrl,
-                                    content = parentComment.content,
-                                    timestampSeconds = parentComment.timestampSeconds,
-                                    parentCommentId = null,
-                                    createdAt = parentComment.createdAt.toString(),
-                                    replies = replies
-                                )
-                            )
+                Mono.fromCallable {
+                    userProfileRepository.findUserInfosByUserIds(userIds)
+                }.flatMapMany { userInfoMap ->
+                    val repliesByParentId = comments.filter { it.parentCommentId != null }
+                        .groupBy { it.parentCommentId!! }
+
+                    val parentComments = comments.filter { it.parentCommentId == null }
+
+                    Flux.fromIterable(parentComments)
+                        .map { parentComment ->
+                            val userInfo = userInfoMap[parentComment.userId] ?: Pair("Unknown", null)
+                            val replies = repliesByParentId[parentComment.id!!]?.map { reply ->
+                                val replyUserInfo = userInfoMap[reply.userId] ?: Pair("Unknown", null)
+                                mapToCommentResponse(reply, replyUserInfo, emptyList())
+                            } ?: emptyList()
+
+                            mapToCommentResponse(parentComment, userInfo, replies)
                         }
-                    }
+                }
             }
             .doOnComplete { logger.debug("Comments retrieved successfully: contentId={}", contentId) }
     }
@@ -201,18 +190,17 @@ class CommentServiceImpl(
     override fun deleteComment(userId: UUID, commentId: UUID): Mono<Void> {
         logger.debug("Deleting comment: userId={}, commentId={}", userId, commentId)
 
-        return commentRepository.findById(commentId)
-            .switchIfEmpty(Mono.error(CommentException.CommentNotFoundException(commentId)))
-            .flatMap { comment ->
-                // 소유권 확인
-                if (comment.userId != userId) {
-                    return@flatMap Mono.error<Void>(CommentException.CommentAccessDeniedException(commentId))
-                }
-
-                // 댓글 삭제 및 카운터 감소
-                commentRepository.delete(commentId, userId)
-                    .then(contentInteractionRepository.decrementCommentCount(comment.contentId))
+        return Mono.fromCallable {
+            commentRepository.findById(commentId)
+                ?: throw CommentException.CommentNotFoundException(commentId)
+        }.flatMap { comment ->
+            if (comment.userId != userId) {
+                return@flatMap Mono.error<Void>(CommentException.CommentAccessDeniedException(commentId))
             }
+
+            Mono.fromCallable { commentRepository.delete(commentId, userId) }
+                .then(contentInteractionRepository.decrementCommentCount(comment.contentId))
+        }
             .doOnSuccess { logger.debug("Comment deleted successfully: commentId={}", commentId) }
             .doOnError { error ->
                 logger.error("Failed to delete comment: userId={}, commentId={}", userId, commentId, error)
@@ -224,26 +212,30 @@ class CommentServiceImpl(
     }
 
     /**
-     * 사용자 정보 조회
+     * Comment 엔티티를 CommentResponse DTO로 변환
      *
-     * @param userId 사용자 ID
-     * @return (닉네임, 프로필 이미지 URL)
+     * @param comment 댓글 엔티티
+     * @param userInfo 사용자 정보 (닉네임, 프로필 이미지 URL)
+     * @param replies 대댓글 목록
+     * @return CommentResponse DTO
      */
-    private fun getUserInfo(userId: UUID): Mono<Pair<String, String?>> {
-        return Mono.fromCallable {
-            dslContext
-                .select(USER_PROFILES.NICKNAME, USER_PROFILES.PROFILE_IMAGE_URL)
-                .from(USER_PROFILES)
-                .where(USER_PROFILES.USER_ID.eq(userId.toString()))
-                .and(USER_PROFILES.DELETED_AT.isNull)
-                .fetchOne()
-                ?.let {
-                    Pair(
-                        it.getValue(USER_PROFILES.NICKNAME) ?: "Unknown",
-                        it.getValue(USER_PROFILES.PROFILE_IMAGE_URL)
-                    )
-                } ?: Pair("Unknown", null)
-        }
+    private fun mapToCommentResponse(
+        comment: Comment,
+        userInfo: Pair<String, String?>,
+        replies: List<CommentResponse>
+    ): CommentResponse {
+        return CommentResponse(
+            id = comment.id!!.toString(),
+            contentId = comment.contentId.toString(),
+            userId = comment.userId.toString(),
+            userNickname = userInfo.first,
+            userProfileImageUrl = userInfo.second,
+            content = comment.content,
+            timestampSeconds = comment.timestampSeconds,
+            parentCommentId = comment.parentCommentId?.toString(),
+            createdAt = comment.createdAt.toString(),
+            replies = replies
+        )
     }
 
     companion object {

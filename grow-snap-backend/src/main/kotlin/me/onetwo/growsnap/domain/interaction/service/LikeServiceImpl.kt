@@ -55,17 +55,14 @@ class LikeServiceImpl(
     override fun likeContent(userId: UUID, contentId: UUID): Mono<LikeResponse> {
         logger.debug("Liking content: userId={}, contentId={}", userId, contentId)
 
-        return userLikeRepository.exists(userId, contentId)
+        return Mono.fromCallable { userLikeRepository.exists(userId, contentId) }
             .flatMap { exists ->
                 if (exists) {
-                    // 이미 좋아요가 있으면 현재 상태 반환
                     logger.debug("Content already liked: userId={}, contentId={}", userId, contentId)
-                    getLikeResponse(userId, contentId, true)
+                    getLikeResponse(contentId, true)
                 } else {
-                    // 1. user_likes 테이블에 저장
-                    userLikeRepository.save(userId, contentId)
+                    Mono.fromCallable { userLikeRepository.save(userId, contentId) }
                         .then(
-                            // 2. AnalyticsService로 이벤트 발행 (카운터 증가 + user_content_interactions 저장)
                             analyticsService.trackInteractionEvent(
                                 userId,
                                 InteractionEventRequest(
@@ -74,7 +71,7 @@ class LikeServiceImpl(
                                 )
                             )
                         )
-                        .then(getLikeResponse(userId, contentId, true))
+                        .then(getLikeResponse(contentId, true))
                 }
             }
             .doOnSuccess { logger.debug("Content liked successfully: userId={}, contentId={}", userId, contentId) }
@@ -102,17 +99,15 @@ class LikeServiceImpl(
     override fun unlikeContent(userId: UUID, contentId: UUID): Mono<LikeResponse> {
         logger.debug("Unliking content: userId={}, contentId={}", userId, contentId)
 
-        return userLikeRepository.exists(userId, contentId)
+        return Mono.fromCallable { userLikeRepository.exists(userId, contentId) }
             .flatMap { exists ->
                 if (!exists) {
-                    // 좋아요가 없으면 현재 상태 반환
                     logger.debug("Content not liked: userId={}, contentId={}", userId, contentId)
-                    getLikeResponse(userId, contentId, false)
+                    getLikeResponse(contentId, false)
                 } else {
-                    // 좋아요 삭제 및 카운터 감소
-                    userLikeRepository.delete(userId, contentId)
+                    Mono.fromCallable { userLikeRepository.delete(userId, contentId) }
                         .then(contentInteractionRepository.decrementLikeCount(contentId))
-                        .then(getLikeResponse(userId, contentId, false))
+                        .then(getLikeResponse(contentId, false))
                 }
             }
             .doOnSuccess { logger.debug("Content unliked successfully: userId={}, contentId={}", userId, contentId) }
@@ -145,12 +140,11 @@ class LikeServiceImpl(
     /**
      * 좋아요 응답 생성
      *
-     * @param userId 사용자 ID
      * @param contentId 콘텐츠 ID
      * @param isLiked 좋아요 여부
      * @return 좋아요 응답
      */
-    private fun getLikeResponse(userId: UUID, contentId: UUID, isLiked: Boolean): Mono<LikeResponse> {
+    private fun getLikeResponse(contentId: UUID, isLiked: Boolean): Mono<LikeResponse> {
         return contentInteractionRepository.getLikeCount(contentId)
             .map { likeCount ->
                 LikeResponse(
